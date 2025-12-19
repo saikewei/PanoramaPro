@@ -22,3 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "PanoramaPro"
 include(":app")
+// 👇 添加opencv
+include(":opencv")
+project(":opencv").projectDir = File(rootDir, "opencv/sdk")
