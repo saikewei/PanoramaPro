@@ -48,10 +48,38 @@ E:\PanoramaPro\ (你的项目根路径)
 ```
 **提示: 项目已配置 .gitignore 忽略 opencv/ 目录，请不要强制将其添加到版本控制中。**
 
-## ✅ 3. 验证与同步
-1. 打开 Android Studio。
+---
 
-2. 点击右上角的 Sync Project with Gradle Files (大象图标)。
+## 📐 3. 手动导入 Eigen 库 (新增步骤)
 
-3. Sync 成功：如果底部 Build 面板显示 BUILD SUCCESSFUL，说明配置完成。
+本项目使用 **Eigen** 进行矩阵运算（APAP 算法核心依赖）。它是一个纯头文件库，配置非常简单。
 
+### 3.1 下载
+1.  访问 [Eigen 官网下载页](https://gitlab.com/libeigen/eigen/-/releases).
+2.  找到 **5.0.0** 版本。
+3.  点击 **Source code (zip)** 下载压缩包。
+
+### 3.2 解压与重命名
+1.  解压下载的压缩包。
+2.  你会看到一个名为 `eigen-5.0.0` (或类似版本号) 的文件夹。
+3.  将其**重命名**为：`eigen` (全小写)。
+
+### 3.3 放置位置与关键检查
+1.  将重命名后的 `eigen` 文件夹直接复制到项目的 **根目录** 下（与 `opencv` 文件夹并列）。
+2.  **⚠️ 关键检查**：双击进入你刚才放进去的 `eigen` 文件夹，确认里面直接包含一个名为 **`Eigen`** (首字母大写) 的子文件夹。
+
+**✅ 更新后的完整目录结构如下：**
+
+```text
+E:\PanoramaPro\ (你的项目根路径)
+  ├── .git/
+  ├── app/
+  ├── gradle/
+  ├── opencv/           <-- OpenCV 目录
+  │     └── sdk/
+  ├── eigen/            <-- 🆕 必须叫这个名字，放在这里
+  │     ├── Eigen/      <-- ⚠️ 核心头文件目录 (注意首字母大写)
+  │     ├── unsupported/
+  │     └── ...
+  ├── build.gradle.kts
+  └── settings.gradle.kts

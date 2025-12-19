@@ -13,9 +13,6 @@ import org.opencv.core.Scalar;
 
 import static org.junit.Assert.*;
 
-/**
- * 这是一个 "Instrumented test"，它会跑在你的安卓虚拟机上。
- */
 @RunWith(AndroidJUnit4.class)
 public class OpenCVIntegrationTest {
 
