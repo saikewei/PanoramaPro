@@ -9,7 +9,7 @@
 
 在开始之前，请确保你的 Android Studio 已安装以下组件（可在 `SDK Manager` -> `SDK Tools` 中检查）：
 
-* **NDK (Side by side)**: 版本 **25.1.8937393** (r25c) 或 **26.1.10909125** (r26b)。
+* **NDK (Side by side)**: 版本 **27.2.12479018**。
 * **CMake**: 版本 **3.22.1**。
 
 ---

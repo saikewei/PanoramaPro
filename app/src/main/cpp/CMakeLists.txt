@@ -11,6 +11,11 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("panoramapro")
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_ANDROID_STL_TYPE c++_shared)
+
 # 导入opencv
 set(OpenCV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../opencv/sdk/native/jni)
 find_package(OpenCV REQUIRED)
@@ -24,9 +29,6 @@ include_directories(
 include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-
-file(GLOB_RECURSE ALL_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-file(GLOB_RECURSE ALL_HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -42,14 +44,12 @@ file(GLOB_RECURSE ALL_HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 # for GameActivity/NativeActivity derived applications, the same library name must be
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
-        # JNI 入口文件 (它在根目录，需要单独加)
+        # JNI 入口文件
         native-lib.cpp
 
-        # 自动扫描到的所有 src 下的 cpp 文件
-        ${ALL_SOURCE_FILES}
-
-        # 把头文件加在这里只是为了让 IDE 显示它们，不影响编译
-        ${ALL_HEADER_FILES}
+        src/APAP.cpp
+        src/Utils.cpp
+        src/FeatureMatcher.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

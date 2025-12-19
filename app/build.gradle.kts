@@ -8,7 +8,7 @@ android {
         version = release(36)
     }
 
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.example.panoramapro"
@@ -18,10 +18,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        @Suppress("UnstableApiUsage")
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
                 abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+                arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DCMAKE_BUILD_TYPE=Release"
             }
         }
     }
@@ -57,5 +61,4 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-    implementation(project(":opencv"))
 }

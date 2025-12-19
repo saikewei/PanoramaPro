@@ -9,7 +9,7 @@ public interface IStitchingEngine {
      * @param inputImages 输入的一组照片
      * @return 拼接好的全景图
      */
-    Bitmap stitchImages(List<Bitmap> inputImages);
+    Bitmap stitchImages(List<Bitmap> inputImages, boolean enableLinearBlending);
 
     /**
      * 自动补全边缘 (Inpainting)
