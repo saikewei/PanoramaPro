@@ -21,7 +21,7 @@ set(ORT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../onnxruntime)
 include_directories(${ORT_ROOT}/headers)
 add_library(lib_onnxruntime SHARED IMPORTED)
 set_target_properties(lib_onnxruntime PROPERTIES
-        IMPORTED_LOCATION "${ORT_ROOT}/lib/${ANDROID_ABI}/libonnxruntime.so"
+        IMPORTED_LOCATION "${ORT_ROOT}/jni/${ANDROID_ABI}/libonnxruntime.so"
 )
 
 # 导入opencv

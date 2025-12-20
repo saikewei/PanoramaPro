@@ -6,6 +6,7 @@
 #include "APAP.h"
 #include "Utils.h"
 #include "ImageCompleter.h"
+#include "onnxruntime_cxx_api.h"
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_panoramapro_MainActivity_stringFromJNI(
@@ -76,4 +77,32 @@ Java_com_example_panoramapro_core_OpencvCompleter_nativeCompleteImage(
     }
     // 3. Mat -> Bitmap
     return Utils::matToBitmap(env, completed);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_panoramapro_OnnxEnvironment_checkRuntime(
+        JNIEnv* env,
+        jobject /* this */) {
+
+    std::string result;
+
+    try {
+        // 1. 验证链接：调用静态方法获取版本号
+        // 如果链接失败，这里甚至进不来，会直接报 UnsatisfiedLinkError
+        std::string version = Ort::GetVersionString();
+
+        // 2. 验证运行：尝试创建一个 ONNX 环境 (Env)
+        // 这一步验证 .so 是否能正常初始化
+        Ort::Env ort_env(ORT_LOGGING_LEVEL_WARNING, "CheckEnv");
+
+        result = "Success! ONNX Version: " + version;
+
+    } catch (const std::exception& e) {
+        // 捕获 C++ 异常 (比如架构不匹配导致的初始化失败)
+        result = "Error: " + std::string(e.what());
+    } catch (...) {
+        result = "Error: Unknown exception";
+    }
+
+    return env->NewStringUTF(result.c_str());
 }
