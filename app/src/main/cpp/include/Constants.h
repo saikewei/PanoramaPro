@@ -24,5 +24,7 @@ namespace Constants {
 
     // 聚类数量
     constexpr int NUM_CLUSTERS = 2;
+
+    constexpr int INPAINT_RADIUS = 3;
 }
 #endif //PANORAMAPRO_CONSTANTS_H

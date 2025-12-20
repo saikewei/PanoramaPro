@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <vector>
+#include <jni.h>
 
 class Utils {
 public:
@@ -24,5 +25,20 @@ public:
     static void ResizeImageIfTooLarge(cv::Mat& img, int max_size);
 
     static std::vector<cv::Point2f> GetMeshVertices(int width, int height, int mesh_cols, int mesh_rows, double offset_x, double offset_y);
+
+    /**
+         * Bitmap -> cv::Mat
+         * 1. 锁定像素
+         * 2. 转换颜色 (RGBA -> BGR)
+         * 3. 解锁像素
+         * @return 转换后的 Mat (BGR格式)，如果失败返回空 Mat
+         */
+    static cv::Mat bitmapToMat(JNIEnv *env, jobject bitmap);
+
+    /**
+     * 将 C++ 的 cv::Mat 转换为 Java 的 Bitmap
+     * 注意：会执行 BGR -> RGBA 的颜色转换
+     */
+    static jobject matToBitmap(JNIEnv *env, const cv::Mat& src);
 };
 #endif //PANORAMAPRO_UTILS_H

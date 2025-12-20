@@ -4,6 +4,8 @@
 #include <opencv2/opencv.hpp>
 #include <android/bitmap.h>
 #include "APAP.h"
+#include "Utils.h"
+#include "ImageCompleter.h"
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_panoramapro_MainActivity_stringFromJNI(
@@ -20,7 +22,7 @@ Java_com_example_panoramapro_core_APAPStitcher_nativeStitchImages(
         jobjectArray bitmaps,
         jboolean enable_linear_blending) {
 
-    // 1. 解析输入 Bitmap 数组
+    // --- 1. 循环读取图片 ---
     int count = env->GetArrayLength(bitmaps);
     if (count < 2) return nullptr;
 
@@ -28,79 +30,50 @@ Java_com_example_panoramapro_core_APAPStitcher_nativeStitchImages(
     images.reserve(count);
 
     for (int i = 0; i < count; i++) {
+        // A. 获取数组元素 (这会创建一个 Local Reference)
         jobject bitmap = env->GetObjectArrayElement(bitmaps, i);
-        AndroidBitmapInfo info;
-        void* pixels = nullptr;
 
-        if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
-            env->DeleteLocalRef(bitmap); continue;
-        }
-        if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) {
-            env->DeleteLocalRef(bitmap); continue;
-        }
-        if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) {
-            env->DeleteLocalRef(bitmap); continue;
+        // B. 调用刚才封装的单张转换函数
+        cv::Mat img = Utils::bitmapToMat(env, bitmap);
+
+        if (!img.empty()) {
+            images.push_back(img);
         }
 
-        cv::Mat src(int(info.height), int(info.width), CV_8UC4, pixels);
-        cv::Mat img;
-        // RGBA -> BGR (深拷贝)
-        cv::cvtColor(src, img, cv::COLOR_RGBA2BGR);
-
-        if (!img.empty()) images.push_back(img);
-
-        AndroidBitmap_unlockPixels(env, bitmap);
+        // C. 手动释放局部引用
         env->DeleteLocalRef(bitmap);
     }
 
     if (images.size() < 2) return nullptr;
 
-    // 2. 执行拼接
+    // --- 2. 执行算法 ---
     APAP apap;
-    if (!apap.Load_image(std::move(images))) return nullptr;
-
-    cv::Mat result = apap.Stitching(enable_linear_blending == JNI_TRUE);
-    if (result.empty()) return nullptr;
-
-    // 3. 将结果转换为 Bitmap 返回给 Java
-    // 3.1 BGR -> RGBA
-    cv::Mat result_rgba;
-    cv::cvtColor(result, result_rgba, cv::COLOR_BGR2RGBA);
-
-    // 3.2 获取 Bitmap 类和 createBitmap 方法
-    jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
-    jmethodID createBitmapMethod = env->GetStaticMethodID(bitmapCls, "createBitmap",
-                                                          "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
-
-    jclass configCls = env->FindClass("android/graphics/Bitmap$Config");
-    jfieldID configField = env->GetStaticFieldID(configCls, "ARGB_8888",
-                                                 "Landroid/graphics/Bitmap$Config;");
-    jobject config = env->GetStaticObjectField(configCls, configField);
-
-    // 3.3 创建新的 Java Bitmap 对象
-    jobject newBitmap = env->CallStaticObjectMethod(bitmapCls, createBitmapMethod,
-                                                    result_rgba.cols, result_rgba.rows, config);
-
-    if (newBitmap == nullptr) return nullptr;
-
-    // 3.4 填充数据
-    void* resultPixels;
-    if (AndroidBitmap_lockPixels(env, newBitmap, &resultPixels) < 0) {
+    if (!apap.Load_image(std::move(images))) {
         return nullptr;
     }
 
-    // 获取新 Bitmap 的信息（主要是 stride/step）
-    AndroidBitmapInfo info;
-    AndroidBitmap_getInfo(env, newBitmap, &info);
+    cv::Mat result = apap.Stitching(enable_linear_blending == JNI_TRUE);
 
-    // 创建一个指向 Bitmap 内存的 Mat wrapper
-    // 注意使用 info.stride，因为 Bitmap 可能会有行填充
-    cv::Mat dst(int(info.height), int(info.width), CV_8UC4, resultPixels, info.stride);
+    // --- 3. 输出转换 ---
+    return Utils::matToBitmap(env, result);
+}
 
-    // 将数据拷贝进去
-    result_rgba.copyTo(dst);
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_example_panoramapro_core_OpencvCompleter_nativeCompleteImage(
+        JNIEnv* env,
+        jobject /* this */,
+        jobject bitmap) {
+    // 1. Bitmap -> Mat
+    cv::Mat src = Utils::bitmapToMat(env, bitmap);
+    if (src.empty()) {
+        return nullptr;
+    }
 
-    AndroidBitmap_unlockPixels(env, newBitmap);
-
-    return newBitmap;
+    // 2. 调用补全逻辑
+    cv::Mat completed = ImageCompleter::process(src);
+    if (completed.empty()) {
+        return nullptr;
+    }
+    // 3. Mat -> Bitmap
+    return Utils::matToBitmap(env, completed);
 }

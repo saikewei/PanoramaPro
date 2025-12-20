@@ -3,7 +3,9 @@
 //
 
 #include "Utils.h"
+#include "Logger.h"
 #include <numeric>
+#include <android/bitmap.h>
 
 std::vector<Eigen::Vector2d> Utils::CV2Eigen(const std::vector<cv::Point2f>& cv_pts) {
     std::vector<Eigen::Vector2d> eigen_pts;
@@ -88,3 +90,91 @@ std::vector<cv::Point2f> Utils::GetMeshVertices(int width, int height, int mesh_
     }
     return vertices;
 }
+
+cv::Mat Utils::bitmapToMat(JNIEnv *env, jobject bitmap) {
+    // 1. 空指针检查
+    if (bitmap == nullptr) {
+        return {};
+    }
+
+    AndroidBitmapInfo info;
+    void* pixels = nullptr;
+
+    // 2. 获取信息并验证
+    if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) {
+        LOGE("无法获取 Bitmap 信息");
+        return {};
+    }
+
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) {
+        LOGE("Bitmap 格式必须是 RGBA_8888");
+        return {};
+    }
+
+    // 3. 锁定像素
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) {
+        LOGE("锁定像素失败");
+        return {};
+    }
+
+    // 4. 转换数据 (RGBA -> BGR)
+    // CV_8UC4 对应 Android 的 RGBA_8888
+    cv::Mat src(int(info.height), int(info.width), CV_8UC4, pixels);
+    cv::Mat dst;
+
+    // 执行深拷贝转换，dst 拥有自己的内存
+    cv::cvtColor(src, dst, cv::COLOR_RGBA2BGR);
+
+    // 5. 解锁像素
+    AndroidBitmap_unlockPixels(env, bitmap);
+
+    // 注意：这里不执行 env->DeleteLocalRef(bitmap)
+    // 引用管理的责任归还给调用者
+
+    return dst;
+}
+
+jobject Utils::matToBitmap(JNIEnv *env, const cv::Mat &src) {
+    if (src.empty()) return nullptr;
+
+    // 1. 颜色转换 BGR -> RGBA
+    cv::Mat result_rgba;
+    cv::cvtColor(src, result_rgba, cv::COLOR_BGR2RGBA);
+
+    // 2. 获取 Bitmap 类和 createBitmap 方法
+    // 提示：频繁调用时，jclass 和 jmethodID 最好提升为全局变量缓存
+    jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
+    jmethodID createBitmapMethod = env->GetStaticMethodID(bitmapCls, "createBitmap",
+                                                          "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+
+    jclass configCls = env->FindClass("android/graphics/Bitmap$Config");
+    jfieldID configField = env->GetStaticFieldID(configCls, "ARGB_8888",
+                                                 "Landroid/graphics/Bitmap$Config;");
+    jobject config = env->GetStaticObjectField(configCls, configField);
+
+    // 3. 创建 Bitmap 对象
+    jobject newBitmap = env->CallStaticObjectMethod(bitmapCls, createBitmapMethod,
+                                                    result_rgba.cols, result_rgba.rows, config);
+
+    if (newBitmap == nullptr) {
+        LOGE("创建输出 Bitmap 失败");
+        return nullptr;
+    }
+
+    // 4. 将 Mat 数据填充到 Bitmap
+    void* resultPixels;
+    if (AndroidBitmap_lockPixels(env, newBitmap, &resultPixels) < 0) {
+        LOGE("锁定输出 Bitmap 像素失败");
+        return nullptr;
+    }
+
+    // 利用 memcpy 或者 OpenCV 的 copyTo
+    // 注意处理 stride (步长)，虽然 createBitmap 通常是紧凑的，但为了稳健可以用 Mat 包装
+    cv::Mat dst_wrapper(result_rgba.rows, result_rgba.cols, CV_8UC4, resultPixels);
+    result_rgba.copyTo(dst_wrapper);
+
+    AndroidBitmap_unlockPixels(env, newBitmap);
+
+    return newBitmap;
+}
+

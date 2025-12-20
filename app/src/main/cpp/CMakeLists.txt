@@ -50,6 +50,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         src/APAP.cpp
         src/Utils.cpp
         src/FeatureMatcher.cpp
+        src/ImageCompleter.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

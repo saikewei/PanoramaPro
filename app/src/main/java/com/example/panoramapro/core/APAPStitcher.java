@@ -5,7 +5,7 @@ import java.util.List;
 
 public class APAPStitcher implements IStitcher {
     static {
-        System.loadLibrary("native-lib");
+        System.loadLibrary("panoramapro");
     }
 
     @Override
