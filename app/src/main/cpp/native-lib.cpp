@@ -14,7 +14,7 @@ Java_com_example_panoramapro_MainActivity_stringFromJNI(
 }
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_example_panoramapro_core_StitchingEngine_nativeStitchImages(
+Java_com_example_panoramapro_core_APAPStitcher_nativeStitchImages(
         JNIEnv* env,
         jobject /* this */,
         jobjectArray bitmaps,

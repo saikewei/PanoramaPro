@@ -17,10 +17,10 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.example.panoramapro.core.StitchingEngine;
+import com.example.panoramapro.core.APAPStitcher;
 
 @RunWith(AndroidJUnit4.class)
-public class StitchingEngineTest {
+public class StitchingTest {
 
     private static final String TAG = "StitchingTest";
 
@@ -38,10 +38,10 @@ public class StitchingEngineTest {
         Assert.assertNotNull("图片2加载失败", inputBitmaps.get(1));
 
         // 3. 初始化引擎并执行拼接
-        StitchingEngine engine = new StitchingEngine();
+        APAPStitcher engine = new APAPStitcher();
 
         long startTime = System.currentTimeMillis();
-        Bitmap result = engine.stitchImages(inputBitmaps, true);
+        Bitmap result = engine.stitch(inputBitmaps, true);
         long endTime = System.currentTimeMillis();
 
         Log.i(TAG, "拼接耗时: " + (endTime - startTime) + "ms");
