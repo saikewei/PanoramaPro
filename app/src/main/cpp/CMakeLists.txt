@@ -16,6 +16,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_ANDROID_STL_TYPE c++_shared)
 
+# 导入onnxruntime
+set(ORT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../onnxruntime)
+include_directories(${ORT_ROOT}/headers)
+add_library(lib_onnxruntime SHARED IMPORTED)
+set_target_properties(lib_onnxruntime PROPERTIES
+        IMPORTED_LOCATION "${ORT_ROOT}/lib/${ANDROID_ABI}/libonnxruntime.so"
+)
+
 # 导入opencv
 set(OpenCV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../opencv/sdk/native/jni)
 find_package(OpenCV REQUIRED)
@@ -59,6 +67,9 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         ${OpenCV_LIBS}
+        lib_onnxruntime
+
         android
         log
-        jnigraphics)
+        jnigraphics
+)

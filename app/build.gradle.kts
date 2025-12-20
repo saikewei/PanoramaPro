@@ -52,6 +52,15 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs(
+                files("../../opencv/sdk/native/libs"), // OpenCV 的路径
+                files("../../onnxruntime/lib") // ONNX 的路径
+            )
+        }
+    }
 }
 
 dependencies {
