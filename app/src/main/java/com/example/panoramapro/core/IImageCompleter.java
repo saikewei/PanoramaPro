@@ -8,4 +8,6 @@ public interface IImageCompleter {
      * @return 边缘规整后的图片
      */
     Bitmap complete(Bitmap roughPanorama);
+
+    default void release() {}
 }

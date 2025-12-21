@@ -26,5 +26,8 @@ namespace Constants {
     constexpr int NUM_CLUSTERS = 2;
 
     constexpr int INPAINT_RADIUS = 3;
+
+    constexpr int MODEL_INPUT_SIZE = 512;
+    constexpr int BLACK_THRESHOLD = 2;
 }
 #endif //PANORAMAPRO_CONSTANTS_H

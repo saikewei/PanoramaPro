@@ -7,6 +7,7 @@
 #include "Utils.h"
 #include "ImageCompleter.h"
 #include "onnxruntime_cxx_api.h"
+#include "LaMaInpainter.h"
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_panoramapro_MainActivity_stringFromJNI(
@@ -105,4 +106,48 @@ Java_com_example_panoramapro_OnnxEnvironment_checkRuntime(
     }
 
     return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_example_panoramapro_core_LaMaCompleter_nativeInit(
+        JNIEnv* env, jobject, jstring modelPath) {
+
+    const char* path = env->GetStringUTFChars(modelPath, nullptr);
+
+    auto* inpainter = new LaMaInpainter();
+    bool success = inpainter->init(path, LaMaInpainter::EP_NNAPI);
+
+    env->ReleaseStringUTFChars(modelPath, path);
+
+    if (success) {
+        return reinterpret_cast<jlong>(inpainter);
+    } else {
+        delete inpainter;
+        return 0;
+    }
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_example_panoramapro_core_LaMaCompleter_nativeProcess(
+        JNIEnv* env, jobject, jlong handle, jobject bitmap) {
+
+    auto* inpainter = reinterpret_cast<LaMaInpainter*>(handle);
+    if (!inpainter) return nullptr;
+
+    // 1. Bitmap -> Mat (BGR)
+    cv::Mat src = Utils::bitmapToMat(env, bitmap);
+
+    // 2. Run LaMa
+    cv::Mat dst = inpainter->process(src);
+
+    // 3. Mat -> Bitmap
+    return Utils::matToBitmap(env, dst);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_panoramapro_core_LaMaCompleter_nativeRelease(
+        JNIEnv* env, jobject, jlong handle) {
+
+    auto* inpainter = reinterpret_cast<LaMaInpainter*>(handle);
+    delete inpainter;
 }

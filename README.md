@@ -83,3 +83,53 @@ E:\PanoramaPro\ (你的项目根路径)
   │     └── ...
   ├── build.gradle.kts
   └── settings.gradle.kts
+ ```
+
+## 🧠 4. 手动配置 ONNX Runtime 与 AI 模型 (AI 补全依赖)
+
+本项目使用 **LaMa** 模型进行图像智能补全，依赖 **ONNX Runtime** 的 C++ 推理库。由于我们需要进行 Native (C++) 开发，不能仅通过 Gradle 依赖引入，必须手动提取库文件以获取头文件。
+
+### 4.1 准备 ONNX Runtime 库
+
+1.  **下载**：访问 [Maven Central - ONNX Runtime Android](https://central.sonatype.com/artifact/com.microsoft.onnxruntime/onnxruntime-android/1.17.1)。
+2.  **选择文件**：点击右侧 "Download" 按钮，选择下载 **`aar`** 文件 (版本 **1.18.0**)。
+3.  **解压**：
+    * 将下载的 `.aar` 文件后缀名改为 `.zip`。
+    * 解压该压缩包。
+4.  **整理文件夹**（⚠️ 关键步骤）：
+    * 在项目根目录下新建一个文件夹，命名为 **`onnxruntime`**。
+    * 将解压包中的 **`headers`** 文件夹复制到 `onnxruntime` 中。
+    * 将解压包中的 **`jni`** 文件夹复制到 `onnxruntime` 中。
+
+### 4.2 添加 AI 模型文件
+
+为了在手机端流畅运行并防止内存溢出 (OOM)，我们必须使用 FP16 精度的量化模型。
+
+1.  **获取模型**：`lama_fp32.onnx`。
+2.  **放置位置**：将 `lama_fp32.onnx` 文件放入以下目录（如果目录不存在请手动创建）：
+    * `app/src/main/assets/`
+
+---
+
+## ✅ 最终目录结构核对
+
+配置完成后，你的项目根目录应包含以下关键文件夹。请务必仔细核对 **ONNX** 和 **Eigen** 的内部文件夹名称，否则 CMake 编译会报错。
+
+```text
+E:\PanoramaPro\ (项目根目录)
+  ├── .git/
+  ├── app/
+  │     └── src/
+  │          └── main/
+  │               └── assets/
+  │                    └── lama_fp32.onnx  <-- 📄 确认模型文件在这里
+  ├── gradle/
+  ├── opencv/           <-- 📁 OpenCV SDK
+  │     └── sdk/
+  ├── eigen/            <-- 📁 Eigen 库
+  │     └── Eigen/      <-- ⚠️ 确认首字母大写
+  ├── onnxruntime/      <-- 🆕 ONNX Runtime 库
+  │     ├── headers/    <-- ⚠️ 里面全是 .h 头文件 
+  │     └── jni/        <-- ⚠️ 里面是 arm64-v8a 等架构文件夹 
+  ├── build.gradle.kts
+  └── settings.gradle.kts
