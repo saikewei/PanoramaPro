@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/navigation_gallery">
+
+    <fragment
+        android:id="@+id/navigation_gallery"
+        android:name="com.example.panoramapro.ui.gallery.GalleryFragment"
+        android:label="Gallery" />
+
+    <fragment
+        android:id="@+id/navigation_capture"
+        android:name="com.example.panoramapro.ui.capture.CaptureFragment"
+        android:label="Capture" />
+
+    <fragment
+        android:id="@+id/navigation_effects"
+        android:name="com.example.panoramapro.ui.effects.EffectsFragment"
+        android:label="Effects" />
+</navigation>

@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">PanoramaPro</string>
+    <string name="select_images_to_stitch">从相册选择图片拼接 (至少2张)</string>
+    <string name="title_gallery">相册/拼接</string>
+    <string name="title_capture">拍摄</string>
+    <string name="title_effects">特效</string>
 </resources>

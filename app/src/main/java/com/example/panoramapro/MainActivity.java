@@ -1,36 +1,28 @@
 package com.example.panoramapro;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.os.Bundle;
-import android.widget.TextView;
-
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
+import androidx.navigation.ui.NavigationUI;
 import com.example.panoramapro.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Used to load the 'panoramapro' library on application startup.
-    static {
-        System.loadLibrary("panoramapro");
-    }
-
-    private ActivityMainBinding binding;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Example of a call to a native method
-        TextView tv = binding.sampleText;
-        tv.setText(stringFromJNI());
-    }
+        // 获取 NavHostFragment
+        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.nav_host_fragment);
 
-    /**
-     * A native method that is implemented by the 'panoramapro' native library,
-     * which is packaged with this application.
-     */
-    public native String stringFromJNI();
+        if (navHostFragment != null) {
+            NavController navController = navHostFragment.getNavController();
+            // 绑定底部导航栏和控制器
+            NavigationUI.setupWithNavController(binding.navView, navController);
+        }
+    }
 }
