@@ -103,9 +103,7 @@ E:\PanoramaPro\ (你的项目根路径)
 
 ### 4.2 添加 AI 模型文件
 
-为了在手机端流畅运行并防止内存溢出 (OOM)，我们必须使用 FP16 精度的量化模型。
-
-1.  **获取模型**：`lama_fp32.onnx`。
+1.  **获取模型**：[lama_fp32.onnx](https://huggingface.co/Carve/LaMa-ONNX/blob/main/lama_fp32.onnx)。
 2.  **放置位置**：将 `lama_fp32.onnx` 文件放入以下目录（如果目录不存在请手动创建）：
     * `app/src/main/assets/`
 
