@@ -16,3 +16,4 @@ local.properties
 opencv/*
 onnxruntime/*
 *.onnx
+eigen/
