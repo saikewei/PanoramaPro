@@ -84,4 +84,9 @@ dependencies {
     // 3. Glide (用于加载图片)
     implementation(libs.glide)
     // 如果后续使用 Glide 的注解生成器，可能需要添加: annotationProcessor(libs.glide.compiler)
+
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 }
