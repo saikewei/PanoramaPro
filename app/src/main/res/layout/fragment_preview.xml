@@ -9,7 +9,7 @@
         android:id="@+id/tv_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Preview Photos"
+        android:text="照片预览"
         android:textSize="24sp"
         android:textStyle="bold"
         android:gravity="center"
@@ -62,7 +62,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="Reset"
+            android:text="重置"
             android:enabled="false"/>
         
         <Button
@@ -71,7 +71,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="Stitch"
+            android:text="拼接"
             android:enabled="false"/>
         
     </LinearLayout>

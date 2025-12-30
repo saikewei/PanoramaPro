@@ -95,7 +95,7 @@ public class PreviewFragment extends Fragment {
 
     private void updateUI() {
         if (captures == null || captures.isEmpty()) {
-            tvPhotoCount.setText("No photos");
+            tvPhotoCount.setText("无照片");
             btnNext.setEnabled(false);
             btnReset.setEnabled(false);
         } else {
@@ -113,13 +113,13 @@ public class PreviewFragment extends Fragment {
 
     private void showResetConfirmation() {
         if (captures == null || captures.isEmpty()) {
-            Toast.makeText(requireContext(), "No photos to clear", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "没有要清除的照片", Toast.LENGTH_SHORT).show();
             return;
         }
 
         new AlertDialog.Builder(requireContext())
                 .setTitle("Clear All Photos")
-                .setMessage("Are you sure you want to clear all " + captures.size() + " photos? This will return to the capture screen.")
+                .setMessage("你确定要清除所有的 " + captures.size() + " 张照片？你将退回到拍照界面")
                 .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -132,7 +132,7 @@ public class PreviewFragment extends Fragment {
 
                         // 显示确认消息
                         Toast.makeText(requireContext(),
-                                "All photos cleared",
+                                "所有照片已清除",
                                 Toast.LENGTH_SHORT).show();
 
                         // 返回到拍照界面

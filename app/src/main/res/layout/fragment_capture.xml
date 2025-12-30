@@ -1,77 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@android:color/black">
-
-    <!-- 相机预览 -->
+    android:layout_height="match_parent">
+    
+    <!-- 相机预览视图 -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
-
-    <!-- 控制面板 -->
+    
+    <!-- 顶部控制区域 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
         android:orientation="vertical"
-        android:background="#80000000"
-        android:padding="16dp">
-
-        <!-- 计数显示 -->
+        android:background="#66000000"
+        android:padding="8dp">
+        
+        <!-- 陀螺仪状态显示 -->
         <TextView
-            android:id="@+id/tv_capture_count"
+            android:id="@+id/tv_gyro_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="0/5"
-            android:textColor="@android:color/white"
-            android:textSize="18sp"
+            android:text="陀螺仪启动中..."
+            android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <!-- 拍摄按钮 -->
+            android:layout_marginBottom="4dp"/>
+            
+        <!-- 详细陀螺仪信息 -->
+        <TextView
+            android:id="@+id/tv_gyro_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="陀螺仪信息"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"/>
+    </LinearLayout>
+    
+    <!-- 拍照计数 -->
+    <TextView
+        android:id="@+id/tv_capture_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="当前已拍摄: 0"
+        android:textColor="#FFFFFF"
+        android:background="#66000000"
+        android:padding="8dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="16dp"/>
+    
+    <!-- 底部控制按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:background="#66000000"
+        android:padding="16dp">
+        
+        <Button
+            android:id="@+id/btn_reset"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="重置"
+            android:enabled="false"/>
+            
         <Button
             android:id="@+id/btn_capture"
-            android:layout_width="120dp"
-            android:layout_height="60dp"
-            android:layout_gravity="center"
-            android:text="Capture"
-            android:textSize="16sp"
-            android:backgroundTint="#4CAF50"
-            android:textColor="@android:color/white" />
-
-        <!-- 控制按钮 -->
-        <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="16dp"
-            android:gravity="center">
-
-            <Button
-                android:id="@+id/btn_reset"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Reset"
-                android:layout_marginEnd="8dp"
-                android:enabled="false" />
-
-            <Button
-                android:id="@+id/btn_proceed"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Stitch"
-                android:layout_marginStart="8dp"
-                android:enabled="false"
-                android:backgroundTint="#2196F3"
-                android:textColor="@android:color/white" />
-
-        </LinearLayout>
-
+            android:layout_weight="2"
+            android:text="拍摄"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"/>
+            
+        <Button
+            android:id="@+id/btn_proceed"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="拼接"
+            android:enabled="false"/>
     </LinearLayout>
-
+    
 </RelativeLayout>
