@@ -4,4 +4,11 @@
     <string name="title_gallery">相册/拼接</string>
     <string name="title_capture">拍摄</string>
     <string name="title_effects">特效</string>
+    <string name="title_settings">设置</string>
+    <string name="text_stitching_algorithm">拼接算法选择 (Stitching Algorithm)</string>
+    <string name="text_apap_algorithm">APAP (As-Projective-As-Possible)</string>
+    <string name="text_SIFT_algorithm">SIFT拼接</string>
+    <string name="text_completer_algorithm_choice">补全算法 (Completer)</string>
+    <string name="text_lama_algorithm">LaMa AI (Large Mask Inpainting)</string>
+    <string name="text_no_complete_algorithm">不进行补全 (None)</string>
 </resources>

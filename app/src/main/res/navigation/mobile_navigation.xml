@@ -18,4 +18,9 @@
         android:id="@+id/navigation_effects"
         android:name="com.example.panoramapro.ui.effects.EffectsFragment"
         android:label="Effects" />
+
+    <fragment
+        android:id="@+id/navigation_settings"
+        android:name="com.example.panoramapro.ui.settings.SettingsFragment"
+        android:label="Settings" />
 </navigation>
