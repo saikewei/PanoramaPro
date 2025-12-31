@@ -47,8 +47,8 @@ public class SettingsFragment extends Fragment {
         });
 
         view.findViewById(R.id.layout_comp_choice).setOnClickListener(v -> {
-            String[] options = {"LaMa AI (Large Mask Inpainting)", "不进行补全 (None)"};
-            String[] values = {"LAMA", "NONE"};
+            String[] options = {"LaMa AI (Large Mask Inpainting)", "Opencv 补全", "不进行补全 (None)"};
+            String[] values = {"LAMA", "OPENCV", "NONE"};
             showChoiceDialog("选择补全算法", KEY_COMPLETE_ALGO, options, values);
         });
     }

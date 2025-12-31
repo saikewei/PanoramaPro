@@ -12,9 +12,10 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.example.panoramapro.core.APAPStitcher;
-import com.example.panoramapro.core.LaMaCompleter;
-import com.example.panoramapro.utils.FileUtils;
+
+import com.example.panoramapro.core.IImageCompleter;
+import com.example.panoramapro.core.IStitcher;
+import com.example.panoramapro.core.ImageProcessorFactory;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -60,6 +61,11 @@ public class StitchingViewModel extends AndroidViewModel {
                 Context context = getApplication().getApplicationContext();
                 List<Bitmap> inputBitmaps = new ArrayList<>();
 
+                // 创建工厂获取拼接器和补全器
+                ImageProcessorFactory factory = new ImageProcessorFactory(context);
+                IStitcher stitcher = factory.getStitcher();
+                IImageCompleter completer = factory.getCompleter();
+
                 // 1. 加载图片
                 for (Uri uri : imageUris) {
                     try (InputStream is = context.getContentResolver().openInputStream(uri)) {
@@ -72,8 +78,7 @@ public class StitchingViewModel extends AndroidViewModel {
                     throw new Exception("图片加载失败，无法获取 Bitmap");
                 }
 
-                // 2. 执行 APAP 拼接 (Java -> C++)
-                APAPStitcher stitcher = new APAPStitcher();
+                // 2. 执行拼接 (Java -> C++)
                 Bitmap stitched = stitcher.stitch(inputBitmaps, true);
 
                 if (stitched == null) {
@@ -82,15 +87,7 @@ public class StitchingViewModel extends AndroidViewModel {
 
                 Log.i(TAG, "拼接完成，开始准备模型...");
 
-                // 3. 准备 LaMa 模型 (拷贝到 Files 目录)
-                String modelPath = FileUtils.copyAssetToFilesDir(context, "lama_fp32.onnx");
-                if (modelPath == null) {
-                    throw new Exception("模型文件拷贝失败");
-                }
-
-                // 4. 执行 AI 补全 (Java -> C++)
-                // 注意：LaMaCompleter 需要在不使用时 release，这里为了简单在方法内创建并释放
-                LaMaCompleter completer = new LaMaCompleter(modelPath);
+                // 3. 执行 AI 补全 (Java -> C++)
                 Bitmap finalResult = completer.complete(stitched);
                 completer.release(); // 释放 C++ 资源
 
@@ -98,7 +95,7 @@ public class StitchingViewModel extends AndroidViewModel {
                     throw new Exception("AI 补全返回空结果");
                 }
 
-                // 5. 成功，更新 UI (postValue 会自动切换到主线程)
+                // 4. 成功，更新 UI (postValue 会自动切换到主线程)
                 resultBitmap.postValue(finalResult);
 
             } catch (Exception e) {
