@@ -19,7 +19,7 @@ public class ImageProcessorFactory {
         if (prefs.getString(SettingsFragment.KEY_STITCH_ALGO, "APAP").equals("APAP")) {
             return new APAPStitcher();
         } else {
-            return null;
+            return new SIFTStitcher();
         }
     }
 

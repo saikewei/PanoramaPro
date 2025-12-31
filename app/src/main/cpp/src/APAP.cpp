@@ -80,61 +80,6 @@ static Eigen::MatrixXd ConstructA(const std::vector<Eigen::Vector2d>& src, const
     return A;
 }
 
-// 静态辅助函数：线性加权融合 (Linear Blending / Feathering)
-// 输入：两张尺寸相同的图片（背景为黑色）
-// 输出：融合后的图片
-static cv::Mat BlendImages(const cv::Mat& img1, const cv::Mat& img2) {
-    CV_Assert(img1.size() == img2.size() && img1.type() == img2.type());
-    int h = img1.rows;
-    int w = img1.cols;
-
-    // 1. 生成掩码 (Mask) - 识别非黑区域
-    cv::Mat mask1, mask2;
-    cv::cvtColor(img1, mask1, cv::COLOR_BGR2GRAY);
-    cv::threshold(mask1, mask1, 0, 255, cv::THRESH_BINARY);
-
-    cv::cvtColor(img2, mask2, cv::COLOR_BGR2GRAY);
-    cv::threshold(mask2, mask2, 0, 255, cv::THRESH_BINARY);
-
-    // 2. 计算权重 (距离变换 Distance Transform)
-    // 像素距离边缘越远，权重越大。这能保证图像中心清晰，边缘平滑过渡。
-    cv::Mat weight1, weight2;
-    cv::distanceTransform(mask1, weight1, cv::DIST_L2, 3);
-    cv::distanceTransform(mask2, weight2, cv::DIST_L2, 3);
-
-    // 3. 并行加权融合
-    cv::Mat result = cv::Mat::zeros(h, w, CV_8UC3);
-
-    cv::parallel_for_(cv::Range(0, h), [&](const cv::Range& range) {
-        for (int y = range.start; y < range.end; ++y) {
-            const auto p1 = img1.ptr<cv::Vec3b>(y);
-            const auto p2 = img2.ptr<cv::Vec3b>(y);
-            const float* w1 = weight1.ptr<float>(y);
-            const float* w2 = weight2.ptr<float>(y);
-            auto dst = result.ptr<cv::Vec3b>(y);
-
-            for (int x = 0; x < w; ++x) {
-                float val1 = w1[x];
-                float val2 = w2[x];
-                float sum = val1 + val2;
-
-                if (sum > 1e-5) { // 避免除以零
-                    float alpha = val1 / sum;
-                    float beta = val2 / sum;
-
-                    // 线性混合: pixel = p1 * w1% + p2 * w2%
-                    dst[x][0] = (uchar)(float(p1[x][0]) * alpha + float(p2[x][0]) * beta);
-                    dst[x][1] = (uchar)(float(p1[x][1]) * alpha + float(p2[x][1]) * beta);
-                    dst[x][2] = (uchar)(float(p1[x][2]) * alpha + float(p2[x][2]) * beta);
-                }
-                // else: sum == 0, 保持黑色背景
-            }
-        }
-    });
-
-    return result;
-}
-
 std::vector<Eigen::Matrix3d> APAP::LocalHomography(
         const std::vector<cv::Point2f>& src_pts_cv,
         const std::vector<cv::Point2f>& dst_pts_cv,
@@ -401,7 +346,7 @@ cv::Mat APAP::Stitching(bool enable_linear_blending) {
         // 8. 融合 (Blending)
         if (enable_linear_blending) {
             // 线性加权融合
-            canvas = BlendImages(final_canvas, warped_new);
+            canvas = Utils::BlendImages(final_canvas, warped_new);
             continue;
         }
         // 简单的最大值融合

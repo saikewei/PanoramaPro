@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.panoramapro.core.APAPStitcher;
+import com.example.panoramapro.core.IStitcher;
+import com.example.panoramapro.core.SIFTStitcher;
 
 @RunWith(AndroidJUnit4.class)
 public class StitchingTest {
@@ -38,7 +40,7 @@ public class StitchingTest {
         Assert.assertNotNull("图片2加载失败", inputBitmaps.get(1));
 
         // 3. 初始化引擎并执行拼接
-        APAPStitcher engine = new APAPStitcher();
+        IStitcher engine = new SIFTStitcher();
 
         long startTime = System.currentTimeMillis();
         Bitmap result = engine.stitch(inputBitmaps, true);

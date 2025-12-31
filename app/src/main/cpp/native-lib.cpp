@@ -8,6 +8,7 @@
 #include "ImageCompleter.h"
 #include "onnxruntime_cxx_api.h"
 #include "LaMaInpainter.h"
+#include "SIFT.h"
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_panoramapro_MainActivity_stringFromJNI(
@@ -150,4 +151,47 @@ Java_com_example_panoramapro_core_LaMaCompleter_nativeRelease(
 
     auto* inpainter = reinterpret_cast<LaMaInpainter*>(handle);
     delete inpainter;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_example_panoramapro_core_SIFTStitcher_nativeStitchImages(
+        JNIEnv* env,
+        jobject /* this */,
+        jobjectArray bitmaps,
+        jboolean enable_linear_blending) {
+
+    // --- 1. 循环读取图片 ---
+    int count = env->GetArrayLength(bitmaps);
+    if (count < 2) return nullptr;
+
+    std::vector<cv::Mat> images;
+    images.reserve(count);
+
+    for (int i = 0; i < count; i++) {
+        // A. 获取数组元素 (这会创建一个 Local Reference)
+        jobject bitmap = env->GetObjectArrayElement(bitmaps, i);
+
+        // B. 调用刚才封装的单张转换函数
+        cv::Mat img = Utils::bitmapToMat(env, bitmap);
+
+        if (!img.empty()) {
+            images.push_back(img);
+        }
+
+        // C. 手动释放局部引用
+        env->DeleteLocalRef(bitmap);
+    }
+
+    if (images.size() < 2) return nullptr;
+
+    // --- 2. 执行算法 ---
+    SIFT stitcher;
+    if (!stitcher.Load_image(std::move(images))) {
+        return nullptr;
+    }
+
+    cv::Mat result = stitcher.Stitching(enable_linear_blending == JNI_TRUE);
+
+    // --- 3. 输出转换 ---
+    return Utils::matToBitmap(env, result);
 }
