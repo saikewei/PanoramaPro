@@ -6,6 +6,7 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class StitchingViewModel extends ViewModel {
     private MutableLiveData<ArrayList<Bitmap>> captures = new MutableLiveData<>(new ArrayList<>());
@@ -37,4 +38,16 @@ public class StitchingViewModel extends ViewModel {
     public void resetRequestHandled() {
         resetRequested.setValue(false);
     }
+
+    // 在StitchingViewModel类中添加
+    private MutableLiveData<List<String>> tempImagePaths = new MutableLiveData<>(new ArrayList<>());
+
+    public MutableLiveData<List<String>> getTempImagePaths() {
+        return tempImagePaths;
+    }
+
+    public void setTempImagePaths(List<String> paths) {
+        tempImagePaths.setValue(paths);
+    }
+
 }

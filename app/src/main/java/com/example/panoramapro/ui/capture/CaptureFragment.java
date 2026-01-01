@@ -62,7 +62,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     private static final String TAG = "CaptureFragment";
     private static final int REQUEST_CAMERA_PERMISSION = 1001; // 相机权限请求码
     private static final int WARNING_THRESHOLD = 5; // 最大拍照数量阈值
-    private static final float ORIENTATION_THRESHOLD = 15.0f; // 角度偏移量阈值（度）
+    private static final float PITCH_THRESHOLD = 20.0f; // 俯仰角阈值（度）
+    private static final float ROLL_THRESHOLD = 30.0f;  // 横滚角阈值（度）
     private static final int REQUIRED_MIN_ASPECT_RATIO = 1; // 最小宽高比要求（宽:高 = 4:3）
 
     // 传感器相关变量
@@ -103,6 +104,9 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     private TextView tvGyroStatus;   // 陀螺仪状态显示
     private TextView tvGyroInfo;     // 陀螺仪详细信息显示
     private TextView tvBaseOrientation; // 基准方向显示
+
+    // 用于存储临时文件路径的列表
+    private ArrayList<String> tempImagePaths = new ArrayList<>();
 
     // 相机状态枚举
     private enum CameraState {
@@ -274,25 +278,32 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     /**
      * 检查方向偏移
      * 检查俯仰角(pitch)和横滚角(roll)的偏移
-     * 当两个角度中有一个超过15度阈值时就提示方向偏移过大
+     * 使用不同的阈值：俯仰角20度，横滚角30度
      */
     private void checkOrientationDeviation() {
         if (baseOrientation == null) {
             return;
         }
 
-        // 只检查俯仰角(索引1)和横滚角(索引2)
+        // 计算俯仰角(索引1)和横滚角(索引2)的偏移
         float pitchDeviation = Math.abs(currentOrientation[1] - baseOrientation[1]);
         float rollDeviation = Math.abs(currentOrientation[2] - baseOrientation[2]);
 
+        // 检查是否超过各自的阈值
+        boolean pitchExceeded = pitchDeviation > PITCH_THRESHOLD;
+        boolean rollExceeded = rollDeviation > ROLL_THRESHOLD;
+
         // 当俯仰角或横滚角的偏移有一个超过阈值时，就标记为方向偏移过大
-        isOrientationExceeded = (pitchDeviation > ORIENTATION_THRESHOLD) || (rollDeviation > ORIENTATION_THRESHOLD);
+        isOrientationExceeded = pitchExceeded || rollExceeded;
 
         // 记录调试信息
         if (isOrientationExceeded) {
-            Log.i(TAG, String.format(Locale.getDefault(),
-                    "方向偏移过大: 俯仰角偏移=%.1f°, 横滚角偏移=%.1f° (阈值=%.1f°)",
-                    pitchDeviation, rollDeviation, ORIENTATION_THRESHOLD));
+            String message = String.format(Locale.getDefault(),
+                    "方向偏移过大: 俯仰角偏移=%.1f°/%s 横滚角偏移=%.1f°/%s (阈值: 俯仰角%.0f°, 横滚角%.0f°)",
+                    pitchDeviation, pitchExceeded ? "超出" : "正常",
+                    rollDeviation, rollExceeded ? "超出" : "正常",
+                    PITCH_THRESHOLD, ROLL_THRESHOLD);
+            Log.i(TAG, message);
         }
     }
 
@@ -316,11 +327,14 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                 tvGyroStatus.setBackgroundColor(Color.TRANSPARENT);
             }
 
-            // 更新陀螺仪信息 - 只显示俯仰角和横滚角
+            // 更新陀螺仪信息 - 显示俯仰角、横滚角和方位角
             String gyroInfo = String.format(Locale.getDefault(),
-                    "当前: 俯仰角: %.1f°  横滚角: %.1f°",
+                    "当前: 方位角: %.1f°  俯仰角: %.1f°  横滚角: %.1f°\n阈值: 俯仰角 ≤ %.0f°  横滚角 ≤ %.0f°",
+                    currentOrientation[0], // 方位角
                     currentOrientation[1], // 俯仰角
-                    currentOrientation[2]); // 横滚角
+                    currentOrientation[2], // 横滚角
+                    PITCH_THRESHOLD,
+                    ROLL_THRESHOLD);
 
             tvGyroInfo.setText(gyroInfo);
 
@@ -331,17 +345,18 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                 tvGyroInfo.setTextColor(Color.WHITE);
             }
 
-            // 更新基准方向显示
+            // 更新基准方向显示 - 显示所有三个角度
             if (baseOrientation != null) {
                 String baseInfo = String.format(Locale.getDefault(),
-                        "基准: 俯仰角: %.1f°  横滚角: %.1f°",
+                        "基准: 方位角: %.1f°  俯仰角: %.1f°  横滚角: %.1f°",
+                        baseOrientation[0], // 基准方位角
                         baseOrientation[1], // 基准俯仰角
                         baseOrientation[2]); // 基准横滚角
                 tvBaseOrientation.setText(baseInfo);
                 tvBaseOrientation.setTextColor(Color.YELLOW);
                 tvBaseOrientation.setBackgroundColor(Color.parseColor("#66000000"));
             } else {
-                tvBaseOrientation.setText("基准: 未设置");
+                tvBaseOrientation.setText("基准: 未设置（拍摄第一张照片时记录）");
                 tvBaseOrientation.setTextColor(Color.LTGRAY);
                 tvBaseOrientation.setBackgroundColor(Color.TRANSPARENT);
             }
@@ -439,11 +454,12 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         // 如果布局中没有陀螺仪信息视图，动态创建
         if (tvGyroInfo == null) {
             tvGyroInfo = new TextView(requireContext());
-            tvGyroInfo.setText("陀螺仪数据将在此显示");
+            tvGyroInfo.setText("陀螺仪数据将在此显示\n阈值: 俯仰角≤20° 横滚角≤30°");
             tvGyroInfo.setTextColor(Color.WHITE);
             tvGyroInfo.setBackgroundColor(Color.parseColor("#66000000"));
             tvGyroInfo.setPadding(16, 8, 16, 8);
             tvGyroInfo.setTextSize(12);
+            tvGyroInfo.setMaxLines(3); // 允许显示多行
 
             ViewGroup rootView = (ViewGroup) view;
             ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(
@@ -458,7 +474,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         // 如果布局中没有基准方向视图，动态创建
         if (tvBaseOrientation == null) {
             tvBaseOrientation = new TextView(requireContext());
-            tvBaseOrientation.setText("基准: 未设置");
+            tvBaseOrientation.setText("基准: 未设置（拍摄第一张照片时记录）");
             tvBaseOrientation.setTextColor(Color.LTGRAY);
             tvBaseOrientation.setPadding(16, 8, 16, 8);
             tvBaseOrientation.setTextSize(12);
@@ -469,7 +485,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
             params = new ViewGroup.MarginLayoutParams(params);
-            ((ViewGroup.MarginLayoutParams) params).topMargin = 150; // 放在陀螺仪信息下方
+            ((ViewGroup.MarginLayoutParams) params).topMargin = 180; // 放在陀螺仪信息下方
             rootView.addView(tvBaseOrientation, params);
         }
 
@@ -494,6 +510,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
             if (resetNeeded != null && resetNeeded) {
                 // 清空本地captures列表
                 captures.clear();
+                // 清理临时文件
+                cleanupTempFiles();
                 // 重置基准方向
                 baseOrientation = null;
                 isOrientationExceeded = false;
@@ -794,9 +812,24 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
 
         // 检查陀螺仪状态（从第二张照片开始检查）
         if (isOrientationExceeded && captures.size() > 0) {
+            // 显示具体的偏移信息
+            String message = "当前方向已超过基准方向：\n";
+            if (baseOrientation != null) {
+                float pitchDeviation = Math.abs(currentOrientation[1] - baseOrientation[1]);
+                float rollDeviation = Math.abs(currentOrientation[2] - baseOrientation[2]);
+
+                if (pitchDeviation > PITCH_THRESHOLD) {
+                    message += String.format(Locale.getDefault(), "• 俯仰角偏移: %.1f° (超过%.0f°阈值)\n", pitchDeviation, PITCH_THRESHOLD);
+                }
+                if (rollDeviation > ROLL_THRESHOLD) {
+                    message += String.format(Locale.getDefault(), "• 横滚角偏移: %.1f° (超过%.0f°阈值)\n", rollDeviation, ROLL_THRESHOLD);
+                }
+            }
+            message += "\n是否继续？";
+
             new AlertDialog.Builder(requireContext())
                     .setTitle("警告：方向偏移过大")
-                    .setMessage("当前方向已超过基准方向的15度。是否继续？")
+                    .setMessage(message)
                     .setPositiveButton("继续", (dialog, which) -> {
                         dialog.dismiss();
                         takePhoto();
@@ -908,8 +941,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                         });
                     }
 
-                    // 保存处理后的图片
-                    Bitmap finalBitmap = saveProcessedPhoto(rotatedBitmap, photoFile);
+                    // 保存处理后的图片到缓存
+                    Bitmap finalBitmap = saveToCache(rotatedBitmap, photoFile);
 
                     if (finalBitmap != null) {
                         captures.add(finalBitmap);
@@ -921,7 +954,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                                 baseOrientation = new float[3];
                                 System.arraycopy(currentOrientation, 0, baseOrientation, 0, 3);
                                 Log.i(TAG, "基准方向已记录: " +
-                                        String.format(Locale.getDefault(), "方位角=%.1f, 俯仰角=%.1f, 横滚角=%.1f",
+                                        String.format(Locale.getDefault(), "方位角=%.1f°, 俯仰角=%.1f°, 横滚角=%.1f°",
                                                 baseOrientation[0], baseOrientation[1], baseOrientation[2]));
 
                                 requireActivity().runOnUiThread(() -> {
@@ -938,14 +971,14 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                         requireActivity().runOnUiThread(() -> {
                             updateUIState();
                             Toast.makeText(requireContext(),
-                                    String.format("已拍摄照片 %d", captures.size()),
+                                    String.format("已拍摄照片 %d/%d", captures.size(), WARNING_THRESHOLD),
                                     Toast.LENGTH_SHORT).show();
                         });
                     }
 
                     // 回收原始bitmap
                     originalBitmap.recycle();
-                    if (rotatedBitmap != finalBitmap) {
+                    if (rotatedBitmap != finalBitmap && rotatedBitmap != originalBitmap) {
                         rotatedBitmap.recycle();
                     }
                 } else {
@@ -1024,22 +1057,18 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     }
 
     /**
-     * 保存处理后的照片
-     * 将处理后的bitmap保存为JPEG文件，并返回预览版本
+     * 保存到缓存
+     * 将处理后的bitmap保存到应用的缓存目录，并返回预览版本
      */
-    private Bitmap saveProcessedPhoto(Bitmap bitmap, File originalFile) {
+    private Bitmap saveToCache(Bitmap bitmap, File originalFile) {
         try {
             // 创建处理后的文件名
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-            String imageFileName = "PANORAMA_PROCESSED_" + timeStamp + "_" + captures.size() + ".jpg";
+            String imageFileName = "PANORAMA_TEMP_" + timeStamp + "_" + captures.size() + ".jpg";
 
-            // 获取存储目录
-            File storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            if (storageDir == null) {
-                storageDir = requireContext().getFilesDir();
-            }
-
-            File outputFile = new File(storageDir, imageFileName);
+            // 获取缓存目录
+            File cacheDir = requireContext().getCacheDir();
+            File outputFile = new File(cacheDir, imageFileName);
 
             // 保存图片
             FileOutputStream fos = new FileOutputStream(outputFile);
@@ -1047,7 +1076,10 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
             fos.flush();
             fos.close();
 
-            Log.i(TAG, "处理后的照片保存到: " + outputFile.getAbsolutePath());
+            Log.i(TAG, "处理后的照片保存到缓存: " + outputFile.getAbsolutePath());
+
+            // 记录临时文件路径
+            tempImagePaths.add(outputFile.getAbsolutePath());
 
             // 返回一个缩小的版本用于预览，以节省内存
             BitmapFactory.Options options = new BitmapFactory.Options();
@@ -1057,7 +1089,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
             return previewBitmap != null ? previewBitmap : bitmap;
 
         } catch (IOException e) {
-            Log.e(TAG, "保存处理后的照片失败: " + e.getMessage(), e);
+            Log.e(TAG, "保存到缓存失败: " + e.getMessage(), e);
             return null;
         }
     }
@@ -1068,11 +1100,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
      */
     private File createImageFile() {
         try {
-            // 创建临时文件目录
-            File storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            if (storageDir == null) {
-                storageDir = requireContext().getFilesDir();
-            }
+            // 创建临时文件目录 - 使用缓存目录
+            File storageDir = requireContext().getCacheDir();
 
             // 确保目录存在
             if (!storageDir.exists()) {
@@ -1081,7 +1110,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
 
             // 创建文件名
             String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-            String imageFileName = "PANORAMA_" + timeStamp + "_" + captures.size();
+            String imageFileName = "PANORAMA_RAW_" + timeStamp + "_" + captures.size();
             File imageFile = File.createTempFile(
                     imageFileName,  /* 前缀 */
                     ".jpg",         /* 后缀 */
@@ -1093,6 +1122,28 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
             Log.e(TAG, "创建图像文件失败", e);
             return null;
         }
+    }
+
+    /**
+     * 清理临时文件
+     * 删除所有保存在缓存中的图片文件
+     */
+    private void cleanupTempFiles() {
+        int deletedCount = 0;
+        for (String path : tempImagePaths) {
+            File file = new File(path);
+            if (file.exists()) {
+                boolean deleted = file.delete();
+                if (deleted) {
+                    deletedCount++;
+                    Log.i(TAG, "已删除临时文件: " + path);
+                } else {
+                    Log.w(TAG, "删除临时文件失败: " + path);
+                }
+            }
+        }
+        tempImagePaths.clear();
+        Log.i(TAG, "共清理了 " + deletedCount + " 个临时文件");
     }
 
     /**
@@ -1176,7 +1227,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
 
     /**
      * 重置捕获的照片
-     * 清空所有已拍摄的照片，重置基准方向
+     * 清空所有已拍摄的照片，重置基准方向，并清理临时文件
      */
     private void resetCaptures() {
         if (captures.isEmpty()) {
@@ -1191,6 +1242,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         captures.clear();
+                        // 清理临时文件
+                        cleanupTempFiles();
                         baseOrientation = null;
                         isOrientationExceeded = false;
                         updateUIState();
@@ -1211,6 +1264,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     /**
      * 进入预览界面
      * 将捕获的照片传递给ViewModel，并导航到预览Fragment
+     * 注意：这里不再清理临时文件，因为预览和拼接过程还需要这些文件
      */
     private void proceedToPreview() {
         if (captures.size() < 2) {
@@ -1220,6 +1274,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
 
         // 保存到ViewModel
         viewModel.setCaptures(new ArrayList<>(captures));
+        // 传递临时文件路径给ViewModel，以便在拼接完成后清理
+        viewModel.setTempImagePaths(new ArrayList<>(tempImagePaths));
 
         // 显示成功消息
         Toast.makeText(requireContext(),
@@ -1327,6 +1383,12 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         if (cameraExecutor != null) {
             cameraExecutor.shutdown();
         }
+
+        // 清理临时文件（如果还有未处理的）
+        if (!tempImagePaths.isEmpty()) {
+            cleanupTempFiles();
+        }
+
         Log.i(TAG, "Fragment已销毁");
     }
 }

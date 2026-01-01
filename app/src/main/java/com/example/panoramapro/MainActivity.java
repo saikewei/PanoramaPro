@@ -7,6 +7,9 @@ import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
 import com.example.panoramapro.databinding.ActivityMainBinding;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class MainActivity extends AppCompatActivity {
 
     @Override
@@ -21,8 +24,17 @@ public class MainActivity extends AppCompatActivity {
 
         if (navHostFragment != null) {
             NavController navController = navHostFragment.getNavController();
-            // 绑定底部导航栏和控制器
+
+            // 配置 NavigationUI
             NavigationUI.setupWithNavController(binding.navView, navController);
+
+            // 监听导航变化，确保预览界面时"拍摄"被选中
+            navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+                // 如果当前在预览界面，确保"拍摄"被选中
+                if (destination.getId() == R.id.previewFragment) {
+                    binding.navView.getMenu().findItem(R.id.navigation_capture).setChecked(true);
+                }
+            });
         }
     }
 }
