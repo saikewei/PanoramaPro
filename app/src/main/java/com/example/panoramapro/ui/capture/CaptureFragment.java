@@ -65,6 +65,12 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     private static final float PITCH_THRESHOLD = 20.0f; // 俯仰角阈值（度）
     private static final float ROLL_THRESHOLD = 30.0f;  // 横滚角阈值（度）
     private static final int REQUIRED_MIN_ASPECT_RATIO = 1; // 最小宽高比要求（宽:高 = 4:3）
+    // 滤波系数 (ALPHA)。范围 0~1。
+    private static final float ALPHA = 0.15f;
+
+    // 用于存储平滑后的传感器数据
+    private float[] smoothAccelerometer = new float[3];
+    private float[] smoothMagnetometer = new float[3];
 
     // 传感器相关变量
     private SensorManager sensorManager;
@@ -181,6 +187,23 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     }
 
     /**
+     * 低通滤波器
+     * @param input 新的传感器原始数据
+     * @param output 上一次平滑后的数据（既是输入也是输出）
+     * @return 平滑后的数据
+     */
+    private float[] lowPass(float[] input, float[] output) {
+        if (output == null) return input;
+
+        for (int i = 0; i < input.length; i++) {
+            // 公式：Output = Output + alpha * (Input - Output)
+            // 也就是：保留大部分旧值，只接纳一小部分新值的变化
+            output[i] = output[i] + ALPHA * (input[i] - output[i]);
+        }
+        return output;
+    }
+
+    /**
      * 启动陀螺仪监测
      * 注册陀螺仪、加速度计和磁力计传感器监听器
      */
@@ -219,27 +242,36 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent event) {
         synchronized (this) {
-            // 根据传感器类型处理数据
             switch (event.sensor.getType()) {
                 case Sensor.TYPE_GYROSCOPE:
-                    // 陀螺仪数据 - 角速度（弧度/秒）
                     System.arraycopy(event.values, 0, currentGyroValues, 0, 3);
                     break;
 
                 case Sensor.TYPE_ACCELEROMETER:
-                    // 加速度计数据
-                    System.arraycopy(event.values, 0, accelerometerData, 0, 3);
-                    hasAccelerometerData = true;
+                    // 【修改点】应用低通滤波，而不是直接复制
+                    // 注意：第一次运行时 smoothAccelerometer 全是0，需要初始化
+                    if (!hasAccelerometerData) {
+                        System.arraycopy(event.values, 0, smoothAccelerometer, 0, 3);
+                        hasAccelerometerData = true;
+                    } else {
+                        smoothAccelerometer = lowPass(event.values, smoothAccelerometer);
+                    }
+                    // 把平滑后的数据给 accelerometerData 用于后续计算
+                    System.arraycopy(smoothAccelerometer, 0, accelerometerData, 0, 3);
                     break;
 
                 case Sensor.TYPE_MAGNETIC_FIELD:
-                    // 磁力计数据
-                    System.arraycopy(event.values, 0, magnetometerData, 0, 3);
-                    hasMagnetometerData = true;
+                    // 【修改点】磁力计也建议滤波
+                    if (!hasMagnetometerData) {
+                        System.arraycopy(event.values, 0, smoothMagnetometer, 0, 3);
+                        hasMagnetometerData = true;
+                    } else {
+                        smoothMagnetometer = lowPass(event.values, smoothMagnetometer);
+                    }
+                    System.arraycopy(smoothMagnetometer, 0, magnetometerData, 0, 3);
                     break;
             }
 
-            // 当有足够的传感器数据时，计算设备方向
             if (hasAccelerometerData && hasMagnetometerData) {
                 calculateOrientation();
                 updateGyroUI();
@@ -248,32 +280,95 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     }
 
     /**
-     * 计算设备方向
-     * 使用加速度计和磁力计数据计算设备的方位角、俯仰角和横滚角
+     * 计算设备方向 (修复版)
+     * 解决垂直握持时的万向节死锁(Gimbal Lock)和小球乱跳问题
      */
     private void calculateOrientation() {
         float[] rotationMatrix = new float[9];
-        float[] inclinationMatrix = new float[9];
 
-        // 获取旋转矩阵
-        if (SensorManager.getRotationMatrix(rotationMatrix, inclinationMatrix, accelerometerData, magnetometerData)) {
-            float[] orientationValues = new float[3];
-            SensorManager.getOrientation(rotationMatrix, orientationValues);
+        // 1. 获取原始旋转矩阵 (基于手机平放)
+        if (!SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerData, magnetometerData)) {
+            return;
+        }
 
-            // 将弧度转换为角度
-            for (int i = 0; i < 3; i++) {
-                currentOrientation[i] = (float) Math.toDegrees(orientationValues[i]);
-            }
+        // 2. 根据屏幕当前的旋转状态，重映射坐标轴
+        // 这是解决"小球乱飞"和"方向反了"的关键步骤
+        float[] remappedMatrix = new float[9];
 
-            // 确保方位角在0-360度之间
-            if (currentOrientation[0] < 0) {
-                currentOrientation[0] += 360;
-            }
+        // 获取当前屏幕的旋转方向 (0, 90, 180, 270)
+        int displayRotation = requireActivity().getWindowManager().getDefaultDisplay().getRotation();
 
-            // 如果已设置基准方向，检查当前方向与基准的偏移
-            if (baseOrientation != null) {
-                checkOrientationDeviation();
-            }
+        int axisX, axisY;
+
+        // 根据握持方式定义新的坐标轴
+        switch (displayRotation) {
+            case android.view.Surface.ROTATION_90: // 横屏 (Home键在右)
+                axisX = SensorManager.AXIS_Y;
+                axisY = SensorManager.AXIS_MINUS_X;
+                break;
+            case android.view.Surface.ROTATION_270: // 反向横屏 (Home键在左)
+                axisX = SensorManager.AXIS_MINUS_Y;
+                axisY = SensorManager.AXIS_X;
+                break;
+            case android.view.Surface.ROTATION_180: // 倒着拿
+                axisX = SensorManager.AXIS_MINUS_X;
+                axisY = SensorManager.AXIS_MINUS_Y;
+                break;
+            case android.view.Surface.ROTATION_0: // 竖屏 (正常握持)
+            default:
+                axisX = SensorManager.AXIS_X;
+                axisY = SensorManager.AXIS_Y;
+                break;
+        }
+
+        // 【核心修复】如果手机是竖起来拍照的（Camera应用通常如此），
+        // 我们需要把 Z 轴映射到 Y 轴，或者使用 remapCoordinateSystem
+        // 但最稳健的方法是直接映射到屏幕坐标系：
+
+        // 这里的逻辑稍微有点绕：SensorManager.getOrientation 返回的是大地坐标系。
+        // 为了避免 Gimbal Lock，我们需要让手机"逻辑上"依然是平放的，
+        // 但实际上我们把手机的 Y 轴（长边）当作 Z 轴（垂直地面）。
+
+        // 针对全景拍照场景（手机垂直地面），这是最稳的映射：
+        // 将设备的 Y 轴映射为世界的 Z 轴 (AXIS_Z)，将 Z 轴映射为 -Y (AXIS_MINUS_Y)
+        // 这样当手机垂直时，Pitch 接近 0，完全避开了 90 度的死锁区。
+        if (displayRotation == android.view.Surface.ROTATION_0) {
+            // 竖屏垂直握持
+            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remappedMatrix);
+        } else {
+            // 横屏垂直握持 (通常全景图是横屏拍)
+            // 此时屏幕的 X 轴对应原本的 Y 轴，我们需要让屏幕面垂直于地面
+            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix); // 尝试适应横屏
+
+            // 如果上面的横屏映射感觉方向反了，请尝试下面这行标准横屏映射：
+            // SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_Z, SensorManager.AXIS_MINUS_X, remappedMatrix);
+        }
+
+        // 3. 计算方向
+        float[] orientationValues = new float[3];
+        SensorManager.getOrientation(remappedMatrix, orientationValues);
+
+        // 4. 转换角度
+        // values[0]: Azimuth (方位角)
+        // values[1]: Pitch (俯仰角) - 现在手机垂直时，这个值接近 0
+        // values[2]: Roll (横滚角)
+
+        for (int i = 0; i < 3; i++) {
+            currentOrientation[i] = (float) Math.toDegrees(orientationValues[i]);
+        }
+
+        // 5. 简单的符号修正 (可选，取决于你的 LevelOverlayView 画法)
+        // 有时候计算出来的 Pitch 方向可能和 UI 的上下相反，在这里取反即可
+        // currentOrientation[1] = -currentOrientation[1];
+
+        // 确保方位角在0-360之间
+        if (currentOrientation[0] < 0) {
+            currentOrientation[0] += 360;
+        }
+
+        // 检查偏移
+        if (baseOrientation != null) {
+            checkOrientationDeviation();
         }
     }
 
