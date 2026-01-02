@@ -16,6 +16,20 @@ import java.util.Locale;
 public class BitmapSaver {
     private static final String TAG = "BitmapSaver";
 
+    public static File getPanoramaDir(Context context) {
+        File privateDir;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            privateDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        } else {
+            privateDir = new File(context.getExternalFilesDir(null), "Pictures");
+        }
+        File panoramaDir = new File(privateDir, "Panorama");
+        if (!panoramaDir.exists()) {
+            panoramaDir.mkdirs();
+        }
+        return panoramaDir;
+    }
+
     /**
      * 保存Bitmap到应用私有目录
      * @param context 上下文

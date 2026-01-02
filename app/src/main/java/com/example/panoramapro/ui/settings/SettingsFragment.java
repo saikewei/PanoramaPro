@@ -79,6 +79,13 @@ public class SettingsFragment extends Fragment {
         tvStitch.setText(stitch.equals("APAP") ? "APAP (As-Projective-As-Possible)" : "SIFT拼接");
 
         String comp = prefs.getString(KEY_COMPLETE_ALGO, "LAMA");
-        tvComp.setText(comp.equals("LAMA") ? "LaMa AI (Large Mask Inpainting)" : "不进行补全 (None)");
+        String[] options = {"LaMa AI (Large Mask Inpainting)", "Opencv 补全", "不进行补全 (None)"};
+        String[] values = {"LAMA", "OPENCV", "NONE"};
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(comp)) {
+                tvComp.setText(options[i]);
+                break;
+            }
+        }
     }
 }

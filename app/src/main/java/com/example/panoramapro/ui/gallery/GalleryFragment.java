@@ -1,9 +1,12 @@
 package com.example.panoramapro.ui.gallery;
 
+import android.app.AlertDialog;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -12,22 +15,29 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.bumptech.glide.Glide;
 import com.example.panoramapro.databinding.FragmentGalleryBinding;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GalleryFragment extends Fragment {
 
     private FragmentGalleryBinding binding;
     private StitchingViewModel viewModel;
+    private GalleryAdapter adapter;
 
-    // 注册图片选择器 (替代 startActivityResult)
+    // 系统相册选择器
     private final ActivityResultLauncher<String> pickImagesLauncher = registerForActivityResult(
             new ActivityResultContracts.GetMultipleContents(),
             uris -> {
-                if (uris != null && !uris.isEmpty()) {
-                    // 用户选完了图，传给 ViewModel
+                if (uris != null && uris.size() >= 2) {
                     viewModel.startStitching(uris);
+                } else if (uris != null) {
+                    Toast.makeText(getContext(), "请至少选择2张图片", Toast.LENGTH_SHORT).show();
                 }
             }
     );
@@ -41,52 +51,163 @@ public class GalleryFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        // 初始化 ViewModel
         viewModel = new ViewModelProvider(this).get(StitchingViewModel.class);
 
-        // 绑定按钮事件
-        binding.btnStitch.setOnClickListener(v -> {
-            // 打开系统相册，只选图片
-            pickImagesLauncher.launch("image/*");
-        });
-
+        setupRecyclerView();
+        setupButtons();
         setupObservers();
     }
 
+    private void setupRecyclerView() {
+        adapter = new GalleryAdapter(new GalleryAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(File file, int position) {
+                // 点击预览
+                showPreviewDialog(file);
+            }
+
+            @Override
+            public void onSelectionChanged(int selectedCount) {
+                updateBottomBar(selectedCount > 0);
+            }
+        });
+
+        binding.rvGallery.setLayoutManager(new GridLayoutManager(getContext(), 3));
+        binding.rvGallery.setAdapter(adapter);
+    }
+
+    private void setupButtons() {
+        // 1. 从系统相册导入并拼接
+        binding.btnAddFromSystem.setOnClickListener(v -> pickImagesLauncher.launch("image/*"));
+
+        // 2. 拼接当前相册中选中的图片
+        binding.btnStitchSelected.setOnClickListener(v -> {
+            List<File> selectedFiles = adapter.getSelectedFiles();
+            if (selectedFiles.size() < 2) {
+                Toast.makeText(getContext(), "请至少选择2张图片", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // 将 File 转为 Uri
+            List<Uri> uris = new ArrayList<>();
+            for (File f : selectedFiles) {
+                uris.add(Uri.fromFile(f));
+            }
+
+            // 退出选择模式并开始拼接
+            exitSelectionMode();
+            viewModel.startStitching(uris);
+        });
+
+        // 3. 删除选中
+        binding.btnDelete.setOnClickListener(v -> {
+            List<File> toDelete = adapter.getSelectedFiles();
+            if (!toDelete.isEmpty()) {
+                new AlertDialog.Builder(getContext())
+                        .setTitle("确认删除")
+                        .setMessage("确定要删除这 " + toDelete.size() + " 张图片吗？")
+                        .setPositiveButton("删除", (dialog, which) -> {
+                            viewModel.deleteImages(toDelete);
+                            exitSelectionMode();
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+            }
+        });
+
+        // 4. 取消选择
+        binding.btnCancelSelect.setOnClickListener(v -> exitSelectionMode());
+    }
+
+    private void updateBottomBar(boolean isSelectionMode) {
+        binding.btnAddFromSystem.setVisibility(isSelectionMode ? View.GONE : View.VISIBLE);
+        binding.layoutSelectionActions.setVisibility(isSelectionMode ? View.VISIBLE : View.GONE);
+    }
+
+    private void exitSelectionMode() {
+        adapter.toggleSelectionMode(false);
+        updateBottomBar(false);
+    }
+
     private void setupObservers() {
-        // 1. 观察 Loading 状态
-        viewModel.getIsLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            if (isLoading) {
-                binding.progressBar.setVisibility(View.VISIBLE);
-                binding.btnStitch.setEnabled(false);
-                binding.btnStitch.setText("正在处理中...");
+        // 监听本地文件列表
+        viewModel.getLocalImages().observe(getViewLifecycleOwner(), files -> {
+            if (files == null || files.isEmpty()) {
+                binding.tvEmpty.setVisibility(View.VISIBLE);
+                binding.rvGallery.setVisibility(View.GONE);
             } else {
-                binding.progressBar.setVisibility(View.GONE);
-                binding.btnStitch.setEnabled(true);
-                binding.btnStitch.setText("从相册选择图片拼接");
+                binding.tvEmpty.setVisibility(View.GONE);
+                binding.rvGallery.setVisibility(View.VISIBLE);
             }
+            adapter.setFiles(files);
         });
 
-        // 2. 观察结果图片
-        viewModel.getResultBitmap().observe(getViewLifecycleOwner(), bitmap -> {
-            if (bitmap != null) {
-                Glide.with(this).load(bitmap).into(binding.ivResult);
-                Toast.makeText(getContext(), "处理成功！", Toast.LENGTH_SHORT).show();
-            }
+        // 监听 Loading
+        viewModel.getIsLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            binding.progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            binding.bottomPanel.setVisibility(isLoading ? View.GONE : View.VISIBLE); // 处理时隐藏按钮防止误触
         });
 
-        // 3. 观察错误信息
+        // 监听拼接成功
+        viewModel.getStitchSuccessEvent().observe(getViewLifecycleOwner(), path -> {
+            Toast.makeText(getContext(), "拼接成功并保存！", Toast.LENGTH_SHORT).show();
+            // 可选：成功后直接预览结果
+            showPreviewDialog(new File(path));
+        });
+
+        // 监听错误
         viewModel.getErrorMessage().observe(getViewLifecycleOwner(), msg -> {
-            if (msg != null && !msg.isEmpty()) {
-                Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
-            }
+            Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
         });
+    }
+
+    // 简单的全屏预览 Dialog
+    private void showPreviewDialog(File file) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+
+        // 1. 显式设置 ImageView 的布局参数，防止宽高为 0
+        ImageView imageView = new ImageView(getContext());
+        imageView.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT)); // 强制填满
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+        // 2. 增加 Glide 监听器打印日志
+        Glide.with(this)
+                .load(file)
+                .listener(new com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable com.bumptech.glide.load.engine.GlideException e, Object model, com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable> target, boolean isFirstResource) {
+                        // !!! 在 Logcat 中搜索 "GLIDE_ERROR" 查看具体报错原因
+                        android.util.Log.e("GLIDE_ERROR", "加载失败: " + file.getAbsolutePath(), e);
+                        if (e != null) e.logRootCauses("GLIDE_ERROR"); // 打印详细根因
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(android.graphics.drawable.Drawable resource, Object model, com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable> target, com.bumptech.glide.load.DataSource dataSource, boolean isFirstResource) {
+                        android.util.Log.d("GLIDE_SUCCESS", "图片加载成功，尺寸: " + resource.getIntrinsicWidth() + "x" + resource.getIntrinsicHeight());
+                        return false;
+                    }
+                })
+                .into(imageView);
+
+        builder.setView(imageView);
+        builder.setPositiveButton("关闭", null);
+        builder.show();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 每次界面可见时，重新扫描本地文件
+        if (viewModel != null) {
+            viewModel.loadLocalImages();
+        }
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        binding = null; // 防止内存泄漏
+        binding = null;
     }
 }
