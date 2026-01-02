@@ -57,6 +57,9 @@ public class GalleryAdapter extends RecyclerView.Adapter<GalleryAdapter.ViewHold
         } else {
             selectedFiles.add(file);
         }
+        if (selectedFiles.isEmpty()) {
+            isSelectionMode = false;
+        }
         notifyDataSetChanged();
         listener.onSelectionChanged(selectedFiles.size());
     }
