@@ -171,93 +171,115 @@ public class PreviewFragment extends Fragment {
         }
 
         // 创建并显示结果预览对话框
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext()); // 移除样式参数
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_preview_result, null);
 
-        // 初始化对话框中的视图组件
+        // 初始化对话框组件
         ImageView ivResultPreview = dialogView.findViewById(R.id.iv_result_preview);
         Button btnCancel = dialogView.findViewById(R.id.btn_cancel);
         Button btnSave = dialogView.findViewById(R.id.btn_save);
 
-        // 设置结果图片
-        ivResultPreview.setImageBitmap(stitchedBitmap);
+        Bitmap displayBitmap = stitchedBitmap; // 默认指向原图
 
-        // 如果需要，可以调整图片显示
+        // 定义一个安全的显示尺寸上限（例如 2048px，绝大多数手机都能安全渲染）
+        int MAX_DISPLAY_SIZE = 2048;
+
+        int w = stitchedBitmap.getWidth();
+        int h = stitchedBitmap.getHeight();
+
+        // 如果图片宽或高超过限制，则生成缩略图
+        if (w > MAX_DISPLAY_SIZE || h > MAX_DISPLAY_SIZE) {
+            float aspectRatio = (float) w / h;
+            int newW, newH;
+
+            if (w > h) {
+                newW = MAX_DISPLAY_SIZE;
+                newH = (int) (MAX_DISPLAY_SIZE / aspectRatio);
+            } else {
+                newH = MAX_DISPLAY_SIZE;
+                newW = (int) (MAX_DISPLAY_SIZE * aspectRatio);
+            }
+
+            try {
+                // 创建缩略图专门用于显示
+                Log.i(TAG, "原图尺寸: " + w + "x" + h + " 太大，生成预览缩略图: " + newW + "x" + newH);
+                displayBitmap = Bitmap.createScaledBitmap(stitchedBitmap, newW, newH, true);
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "生成缩略图内存不足", e);
+                // 如果缩略图都生成失败，可能内存极度紧张，尝试直接用原图（虽然可能会崩）或者显示占位图
+            }
+        }
+
+        // 设置给 ImageView 的是（可能缩小过的）displayBitmap
+        ivResultPreview.setImageBitmap(displayBitmap);
+        // ==================== 【关键修改结束】 ====================
+
         if (stitchedBitmap.getHeight() > 600) {
             ivResultPreview.setMaxHeight(600);
             ivResultPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
         }
 
-        // 创建对话框
         AlertDialog resultDialog = builder
                 .setView(dialogView)
-                .setCancelable(false) // 禁止点击外部关闭
+                .setCancelable(false)
                 .create();
 
-        // 设置按钮点击事件
+        // 这里的逻辑需要注意：displayBitmap 可能是新创建的，也可能是原图引用
+        // 为了在 Close 时正确回收，我们需要一个 final 变量来引用可能需要回收的缩略图
+        final Bitmap finalDisplayBitmap = (displayBitmap != stitchedBitmap) ? displayBitmap : null;
+
         btnCancel.setOnClickListener(v -> {
             resultDialog.dismiss();
-            // 可选：返回到上一个界面或保留在当前界面
             Toast.makeText(requireContext(), "已取消", Toast.LENGTH_SHORT).show();
+            // 如果生成了额外的缩略图，记得回收
+            if (finalDisplayBitmap != null && !finalDisplayBitmap.isRecycled()) {
+                finalDisplayBitmap.recycle();
+            }
+            // 原图 stitchedBitmap 由调用者或后续逻辑决定何时回收，通常建议在 Fragment 销毁或重置时回收
         });
 
         btnSave.setOnClickListener(v -> {
             resultDialog.dismiss();
+            // 只要对话框关闭，预览用的缩略图就可以回收了
+            if (finalDisplayBitmap != null && !finalDisplayBitmap.isRecycled()) {
+                finalDisplayBitmap.recycle();
+            }
 
-            // 显示保存进度
             ProgressDialog saveDialog = new ProgressDialog(requireContext());
             saveDialog.setMessage("正在保存图片...");
             saveDialog.setCancelable(false);
             saveDialog.show();
 
-            // 在子线程中执行保存操作
             stitchingExecutor.execute(() -> {
+                // 【注意】保存时依然使用原始的高清 stitchedBitmap
                 String savedPath = BitmapSaver.saveBitmapToPrivateStorage(
                         requireContext().getApplicationContext(),
                         stitchedBitmap
                 );
 
-                // 回到主线程显示结果
                 new Handler(Looper.getMainLooper()).post(() -> {
                     saveDialog.dismiss();
-
                     if (savedPath != null) {
-                        // 简化的路径显示
                         String displayMessage = "全景图保存成功！\n\n路径：" + savedPath;
-
                         new AlertDialog.Builder(requireContext())
                                 .setTitle("保存成功")
                                 .setMessage(displayMessage)
                                 .setPositiveButton("确定", null)
                                 .show();
                     } else {
-                        Toast.makeText(requireContext(),
-                                "保存失败，请重试", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), "保存失败，请重试", Toast.LENGTH_SHORT).show();
                     }
                 });
             });
         });
 
-        // 可选：添加对话框关闭监听器
-        resultDialog.setOnDismissListener(dialog -> {
-            // 可以在对话框关闭时执行一些清理操作
-            Log.d(TAG, "结果预览对话框已关闭");
-        });
-
-        // 显示对话框
         resultDialog.show();
-
-        // 可选：保存到ViewModel中供后续使用
-        // 注释掉这行，因为StitchingViewModel没有这个方法
-        // viewModel.setStitchedResult(stitchedBitmap);
-
-        // 可选：更新UI状态，例如更改按钮文字或禁用某些功能
         btnNext.setText("重新拼接");
         btnNext.setEnabled(true);
 
-        // 可选：显示成功消息
+        // 显示信息时显示原图尺寸
         Toast.makeText(requireContext(),
-                "拼接完成！图片尺寸: " + stitchedBitmap.getWidth() + "x" + stitchedBitmap.getHeight(),
+                "拼接完成！原图尺寸: " + stitchedBitmap.getWidth() + "x" + stitchedBitmap.getHeight(),
                 Toast.LENGTH_LONG).show();
     }
 
