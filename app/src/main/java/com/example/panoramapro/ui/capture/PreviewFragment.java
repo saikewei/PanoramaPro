@@ -3,7 +3,6 @@ package com.example.panoramapro.ui.capture;
 import com.example.panoramapro.core.*;
 
 import android.content.Context;
-import android.app.Application;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.os.Bundle;
@@ -38,9 +37,6 @@ import android.app.ProgressDialog; //用于显示加载框
 import android.os.Handler;
 import android.os.Looper;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 public class PreviewFragment extends Fragment {
     private static final String TAG = "PreviewFragment";
 
@@ -54,7 +50,6 @@ public class PreviewFragment extends Fragment {
     private PhotoPagerAdapter adapter;
 
     private final ExecutorService stitchingExecutor = Executors.newSingleThreadExecutor();
-    private final MutableLiveData<Bitmap> resultBitmap = new MutableLiveData<>();
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -159,7 +154,7 @@ public class PreviewFragment extends Fragment {
                 });
 
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e(TAG, "Stitching error: " + e.getMessage(), e);
                 // 异常处理
                 new Handler(Looper.getMainLooper()).post(() -> {
                     progressDialog.dismiss();

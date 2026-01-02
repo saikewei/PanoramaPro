@@ -86,9 +86,6 @@ public class StitchingViewModel extends AndroidViewModel {
      * 开始拼接任务
      * @param imageUris 用户选中的图片 Uri 列表
      */
-    /**
-     * 开始拼接任务 (支持 Content Uri 或 File Uri)
-     */
     public void startStitching(List<Uri> imageUris) {
         if (imageUris == null || imageUris.size() < 2) {
             errorMessage.setValue("请至少选择两张图片进行拼接");
