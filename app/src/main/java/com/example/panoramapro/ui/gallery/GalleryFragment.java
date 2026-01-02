@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
+import com.example.panoramapro.R;
 
 import com.bumptech.glide.Glide;
 import com.example.panoramapro.databinding.FragmentGalleryBinding;
@@ -162,38 +163,52 @@ public class GalleryFragment extends Fragment {
 
     // 简单的全屏预览 Dialog
     private void showPreviewDialog(File file) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        // 1. 使用全屏主题创建 Dialog
+        android.app.Dialog dialog = new android.app.Dialog(getContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_preview_image);
 
-        // 1. 显式设置 ImageView 的布局参数，防止宽高为 0
-        ImageView imageView = new ImageView(getContext());
-        imageView.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT)); // 强制填满
-        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        // 2. 获取控件
+        ImageView ivPreview = dialog.findViewById(R.id.iv_preview);
+        View progressBar = dialog.findViewById(R.id.pb_loading);
+        View btnClose = dialog.findViewById(R.id.btn_close_preview);
 
-        // 2. 增加 Glide 监听器打印日志
+        // 3. 绑定关闭按钮事件
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        // 4. 使用 Glide 加载图片 (带错误处理和进度条显隐)
+        progressBar.setVisibility(View.VISIBLE);
+
+        // 临时测试：设置一个白色背景，如果你看到白色方块说明 View 没问题，是 Glide 加载不出图
+        // ivPreview.setBackgroundColor(android.graphics.Color.WHITE);
+
         Glide.with(this)
                 .load(file)
                 .listener(new com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable>() {
                     @Override
                     public boolean onLoadFailed(@Nullable com.bumptech.glide.load.engine.GlideException e, Object model, com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable> target, boolean isFirstResource) {
-                        // !!! 在 Logcat 中搜索 "GLIDE_ERROR" 查看具体报错原因
-                        android.util.Log.e("GLIDE_ERROR", "加载失败: " + file.getAbsolutePath(), e);
-                        if (e != null) e.logRootCauses("GLIDE_ERROR"); // 打印详细根因
+                        progressBar.setVisibility(View.GONE);
+                        android.util.Log.e("PREVIEW", "Glide 加载失败: " + file.getAbsolutePath());
+                        if(e != null) e.logRootCauses("PREVIEW");
+
+                        // 弹个 Toast 提示用户
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() ->
+                                    android.widget.Toast.makeText(getContext(), "图片加载失败，请查看日志", android.widget.Toast.LENGTH_SHORT).show()
+                            );
+                        }
                         return false;
                     }
 
                     @Override
                     public boolean onResourceReady(android.graphics.drawable.Drawable resource, Object model, com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable> target, com.bumptech.glide.load.DataSource dataSource, boolean isFirstResource) {
-                        android.util.Log.d("GLIDE_SUCCESS", "图片加载成功，尺寸: " + resource.getIntrinsicWidth() + "x" + resource.getIntrinsicHeight());
+                        progressBar.setVisibility(View.GONE);
                         return false;
                     }
                 })
-                .into(imageView);
+                .into(ivPreview);
 
-        builder.setView(imageView);
-        builder.setPositiveButton("关闭", null);
-        builder.show();
+        // 5. 显示 Dialog
+        dialog.show();
     }
 
     @Override
