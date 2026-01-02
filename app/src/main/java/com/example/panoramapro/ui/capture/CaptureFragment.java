@@ -895,20 +895,20 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         }
 
         // 检查照片数量，超过5张禁止拍摄
-        if (captures.size() >= WARNING_THRESHOLD) {
-            // 直接显示提示，不询问是否继续
-            new AlertDialog.Builder(requireContext())
-                    .setTitle("达到最大照片数量")
-                    .setMessage("您已拍摄5张照片。已达到最大限制。请进行拼接或重置重新开始。")
-                    .setPositiveButton("确定", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.dismiss();
-                        }
-                    })
-                    .show();
-            return;
-        }
+//        if (captures.size() >= WARNING_THRESHOLD) {
+//            // 直接显示提示，不询问是否继续
+//            new AlertDialog.Builder(requireContext())
+//                    .setTitle("达到最大照片数量")
+//                    .setMessage("您已拍摄5张照片。已达到最大限制。请进行拼接或重置重新开始。")
+//                    .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+//                        @Override
+//                        public void onClick(DialogInterface dialog, int which) {
+//                            dialog.dismiss();
+//                        }
+//                    })
+//                    .show();
+//            return;
+//        }
 
         // 检查陀螺仪状态（从第二张照片开始检查）
         if (isOrientationExceeded && captures.size() > 0) {
@@ -950,10 +950,10 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
      */
     private void takePhoto() {
         // 再次检查照片数量（防止在对话框显示期间有其他操作）
-        if (captures.size() >= WARNING_THRESHOLD) {
-            Toast.makeText(requireContext(), "已达到最大照片数量限制", Toast.LENGTH_SHORT).show();
-            return;
-        }
+//        if (captures.size() >= WARNING_THRESHOLD) {
+//            Toast.makeText(requireContext(), "已达到最大照片数量限制", Toast.LENGTH_SHORT).show();
+//            return;
+//        }
 
         // 禁用拍摄按钮避免连续点击
         if (btnCapture != null) {
@@ -1018,10 +1018,10 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         // 在后台线程处理照片
         cameraExecutor.execute(() -> {
             try {
-                if (captures.size() >= WARNING_THRESHOLD) {
-                    Log.i(TAG, "达到最大照片数量，跳过照片处理");
-                    return;
-                }
+//                if (captures.size() >= WARNING_THRESHOLD) {
+//                    Log.i(TAG, "达到最大照片数量，跳过照片处理");
+//                    return;
+//                }
 
                 // 加载原始图片
                 BitmapFactory.Options options = new BitmapFactory.Options();
@@ -1278,28 +1278,22 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
 
         // 更新计数显示
         if (tvCaptureCount != null) {
-            tvCaptureCount.setText(String.format("已拍摄: %d/%d", captures.size(), WARNING_THRESHOLD));
-
-            // 如果达到或超过阈值，显示不同的颜色
-            if (captures.size() >= WARNING_THRESHOLD) {
-                tvCaptureCount.setTextColor(Color.RED);
-            } else {
-                tvCaptureCount.setTextColor(Color.WHITE);
-            }
+            tvCaptureCount.setText(String.format("已拍摄: %d", captures.size()));
+            tvCaptureCount.setTextColor(Color.WHITE); // 始终保持白色，不再变红
         }
 
         // 更新按钮状态
+        // 2. 修改按钮状态逻辑
         if (btnCapture != null) {
-            // 只有在相机准备好且照片数量小于5时才启用拍照按钮
-            boolean canCapture = cameraState == CameraState.READY && captures.size() < WARNING_THRESHOLD;
+            // 原代码: boolean canCapture = cameraState == CameraState.READY && captures.size() < WARNING_THRESHOLD;
+            // 修改为: 只要相机准备好就可以拍
+            boolean canCapture = cameraState == CameraState.READY;
+
             btnCapture.setEnabled(canCapture);
 
             if (cameraState == CameraState.READY) {
-                if (captures.size() >= WARNING_THRESHOLD) {
-                    btnCapture.setText("已达上限");
-                } else {
-                    btnCapture.setText("拍照");
-                }
+                // 移除 "已达上限" 的判断
+                btnCapture.setText("拍照");
             } else if (cameraState == CameraState.NO_PERMISSION) {
                 btnCapture.setText("需要权限");
             } else {
@@ -1315,13 +1309,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         // 处理按钮状态
         if (btnProceed != null) {
             btnProceed.setEnabled(captures.size() >= 2);
-
-            // 如果照片数量达到最大值，提示用户可以拼接了
-            if (captures.size() >= WARNING_THRESHOLD) {
-                btnProceed.setText("立即拼接!");
-            } else {
-                btnProceed.setText("拼接");
-            }
+            // 移除 "立即拼接!" 的强制提示，始终显示 "拼接"
+            btnProceed.setText("拼接");
         }
     }
 
