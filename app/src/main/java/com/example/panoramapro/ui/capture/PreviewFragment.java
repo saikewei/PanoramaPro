@@ -130,26 +130,19 @@ public class PreviewFragment extends Fragment {
         stitchingExecutor.execute(() -> {
             try {
                 // =============== 核心调用开始 ===============
-                // 假设您的拼接类是 StitchingUtil，方法是 stitch
-                // 请将此处替换为您实际的类名和方法调用
-
-                // 示例：Bitmap result = YourStitchingClass.stitch(captures);
-
-                // 模拟调用（替换为您的代码）：
-                IStitcher stitch_photo =new APAPStitcher();
+                ImageProcessorFactory factory = new ImageProcessorFactory(context);
+                IStitcher stitch_photo = factory.getStitcher();
 
                 String modelPath = FileUtils.copyAssetToFilesDir(context, "lama_fp32.onnx");
                 if (modelPath == null) {
                     throw new Exception("模型文件拷贝失败");
                 }
 
-                IImageCompleter fix_photo = new LaMaCompleter(modelPath);
-
                 Bitmap switchBitmap = stitch_photo.stitch(captures,true);// 进行图片拼接
 
                 // 4. 执行 AI 补全 (Java -> C++)
                 // 注意：LaMaCompleter 需要在不使用时 release，这里为了简单在方法内创建并释放
-                LaMaCompleter completer = new LaMaCompleter(modelPath);
+                IImageCompleter completer = factory.getCompleter();
                 Bitmap resultBitmap = completer.complete(switchBitmap);
                 completer.release(); // 释放 C++ 资源
                 // =============== 核心调用结束 ===============
