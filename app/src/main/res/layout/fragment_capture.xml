@@ -1,6 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+    
+    <!-- 相机预览视图 -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+    
+    <!-- 顶部控制区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#66000000"
+        android:padding="8dp">
+        
+        <!-- 陀螺仪状态显示 -->
+        <TextView
+            android:id="@+id/tv_gyro_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="陀螺仪启动中..."
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+            
+        <!-- 详细陀螺仪信息 -->
+        <TextView
+            android:id="@+id/tv_gyro_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="陀螺仪信息"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"/>
+    </LinearLayout>
+    
+    <!-- 拍照计数 -->
+    <TextView
+        android:id="@+id/tv_capture_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="当前已拍摄: 0"
+        android:textColor="#FFFFFF"
+        android:background="#66000000"
+        android:padding="8dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="16dp"/>
+    
+    <!-- 底部控制按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:background="#66000000"
+        android:padding="16dp">
+        
+        <Button
+            android:id="@+id/btn_reset"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="重置"
+            android:enabled="false"/>
+            
+        <Button
+            android:id="@+id/btn_capture"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="拍摄"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"/>
+            
+        <Button
+            android:id="@+id/btn_proceed"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="拼接"
+            android:enabled="false"/>
+    </LinearLayout>
+    
+</RelativeLayout>
