@@ -15,6 +15,8 @@ public class LaMaCompleter implements IImageCompleter {
     // 如果为 0，表示对象未初始化或已释放
     private long nativeHandle = 0;
 
+    private long createTimestampMs;
+
     /**
      * 构造函数
      * @param modelPath 模型文件在手机文件系统中的绝对路径
@@ -33,6 +35,8 @@ public class LaMaCompleter implements IImageCompleter {
 
     @Override
     public Bitmap complete(Bitmap roughPanorama) {
+        // 记录构造开始时间
+        createTimestampMs = android.os.SystemClock.elapsedRealtime();
         // 安全检查
         if (nativeHandle == 0) {
             Log.e(TAG, "错误：尝试使用未初始化或已释放的引擎。");
@@ -54,7 +58,10 @@ public class LaMaCompleter implements IImageCompleter {
         if (nativeHandle != 0) {
             nativeRelease(nativeHandle);
             nativeHandle = 0;
-            Log.i(TAG, "LaMa 引擎资源已释放");
+            long releaseTimestampMs = android.os.SystemClock.elapsedRealtime();
+            long lifetimeMs = releaseTimestampMs - createTimestampMs;
+
+            Log.i(TAG, "LaMa 引擎资源已释放，总生命周期耗时：" + lifetimeMs + " ms");
         }
     }
 
