@@ -66,11 +66,12 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     private static final float ROLL_THRESHOLD = 30.0f;  // 横滚角阈值（度）
     private static final int REQUIRED_MIN_ASPECT_RATIO = 1; // 最小宽高比要求（宽:高 = 4:3）
     // 滤波系数 (ALPHA)。范围 0~1。
-    private static final float ALPHA = 0.15f;
+    private static final float ALPHA = 0.06f;
 
     // 用于存储平滑后的传感器数据
     private float[] smoothAccelerometer = new float[3];
     private float[] smoothMagnetometer = new float[3];
+    private float[] smoothedOrientation = new float[3];
 
     // 传感器相关变量
     private SensorManager sensorManager;
@@ -280,82 +281,80 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     }
 
     /**
-     * 计算设备方向 (智能识别版)
-     * 即使应用被锁定为竖屏，也能通过重力感应自动识别横屏拍摄姿态
+     * 计算设备方向 (智能识别版 + 二级平滑)
      */
     private void calculateOrientation() {
         float[] rotationMatrix = new float[9];
 
-        // 1. 获取原始旋转矩阵
         if (!SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerData, magnetometerData)) {
             return;
         }
 
-        // 获取系统报告的屏幕旋转角度
+        // ... (省略中间判断横竖屏的代码，保持不变) ...
         int displayRotation = requireActivity().getWindowManager().getDefaultDisplay().getRotation();
 
+        // ... (省略重力检测横屏的代码，保持不变) ...
         if (displayRotation == android.view.Surface.ROTATION_0) {
-            // accelerometerData[0] 是 X 轴上的重力分量
-            // 如果 X 轴分量很大（接近 9.8 或 -9.8），说明手机是横着拿的
-
             float xGravity = accelerometerData[0];
-
-            if (xGravity < -4.5f) {
-                // 手机向左倒（Home键在右），这是标准的横屏拍照姿态
-                displayRotation = android.view.Surface.ROTATION_90;
-            } else if (xGravity > 4.5f) {
-                // 手机向右倒（Home键在左），这是反向横屏
-                displayRotation = android.view.Surface.ROTATION_270;
-            }
-            // 否则保持 ROTATION_0 (竖直握持)
+            if (xGravity < -4.5f) displayRotation = android.view.Surface.ROTATION_90;
+            else if (xGravity > 4.5f) displayRotation = android.view.Surface.ROTATION_270;
         }
 
         float[] remappedMatrix = new float[9];
         int axisX, axisY;
 
-        // 2. 根据(可能被修正过的)旋转方向，映射坐标轴
-        // 始终将逻辑 Y 轴映射到物理 Z 轴，以防止 Gimbal Lock
         switch (displayRotation) {
-            case android.view.Surface.ROTATION_90: // 横屏 (Home键在右)
+            case android.view.Surface.ROTATION_90:
                 axisX = SensorManager.AXIS_MINUS_Y;
                 axisY = SensorManager.AXIS_Z;
                 break;
-
-            case android.view.Surface.ROTATION_270: // 反向横屏 (Home键在左)
+            case android.view.Surface.ROTATION_270:
                 axisX = SensorManager.AXIS_Y;
                 axisY = SensorManager.AXIS_Z;
                 break;
-
-            case android.view.Surface.ROTATION_180: // 倒着拿
+            case android.view.Surface.ROTATION_180:
                 axisX = SensorManager.AXIS_MINUS_X;
                 axisY = SensorManager.AXIS_Z;
                 break;
-
-            case android.view.Surface.ROTATION_0: // 竖屏
+            case android.view.Surface.ROTATION_0:
             default:
                 axisX = SensorManager.AXIS_X;
                 axisY = SensorManager.AXIS_Z;
                 break;
         }
 
-        // 3. 应用坐标系重映射
         SensorManager.remapCoordinateSystem(rotationMatrix, axisX, axisY, remappedMatrix);
 
-        // 4. 计算方向
         float[] orientationValues = new float[3];
         SensorManager.getOrientation(remappedMatrix, orientationValues);
 
-        // 5. 转换角度
+        // 【修改开始】应用二级平滑滤波 (Output Smoothing)
+        // 这里的 ALPHA 使用同样的系数，或者定义一个新的 SMOOTH_FACTOR = 0.1f
         for (int i = 0; i < 3; i++) {
-            currentOrientation[i] = (float) Math.toDegrees(orientationValues[i]);
+            float degree = (float) Math.toDegrees(orientationValues[i]);
+
+            // 处理 360/0 度边界突变问题 (针对方位角)
+            if (i == 0) {
+                if (degree < 0) degree += 360;
+                // 方位角特殊平滑，防止在 0 和 360 之间跳变
+                float diff = degree - smoothedOrientation[i];
+                if (diff > 180) degree -= 360;
+                else if (diff < -180) degree += 360;
+            }
+
+            // 低通滤波公式：新值 = 旧值 + 系数 * (目标值 - 旧值)
+            smoothedOrientation[i] = smoothedOrientation[i] + ALPHA * (degree - smoothedOrientation[i]);
+
+            // 赋值给 currentOrientation
+            currentOrientation[i] = smoothedOrientation[i];
         }
 
-        // 修正方位角范围
-        if (currentOrientation[0] < 0) {
-            currentOrientation[0] += 360;
-        }
+        // 修正方位角显示范围 (0-360)
+        if (currentOrientation[0] < 0) currentOrientation[0] += 360;
+        if (currentOrientation[0] >= 360) currentOrientation[0] -= 360;
 
-        // 检查偏移
+        // 【修改结束】
+
         if (baseOrientation != null) {
             checkOrientationDeviation();
         }
@@ -1033,7 +1032,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                 // 定义最大分辨率限制 (例如 2000px)
                 // 原图 4000x3000 -> 内存约 48MB
                 // 降采样后 2000x1500 -> 内存约 12MB (ARGB_8888) 或 6MB (RGB_565)
-                final int MAX_DIMENSION = 1000;
+                final int MAX_DIMENSION = 3000;
 
                 // 1. 第一次解析：只读取图片的宽高信息，不加载到内存
                 BitmapFactory.Options options = new BitmapFactory.Options();
