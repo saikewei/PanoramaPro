@@ -95,6 +95,8 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     private StitchingViewModel viewModel; // 视图模型，用于数据共享
     private boolean cameraStarted = false; // 相机是否已启动
     private boolean permissionRequested = false; // 是否已请求过权限
+    // UI组件
+    private LevelOverlayView levelOverlayView;
 
     // 界面控件
     private Button btnCapture;      // 拍照按钮
@@ -313,53 +315,49 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
      * 显示当前俯仰角和横滚角，以及基准方向（如果已设置）
      */
     private void updateGyroUI() {
-        if (getActivity() == null || tvGyroStatus == null || tvGyroInfo == null || tvBaseOrientation == null) return;
+        // 检查视图是否存在
+        if (getActivity() == null) return;
 
         requireActivity().runOnUiThread(() -> {
-            // 更新状态显示
-            if (isOrientationExceeded) {
-                tvGyroStatus.setText("⚠️ 方向偏移过大！");
-                tvGyroStatus.setTextColor(Color.RED);
-                tvGyroStatus.setBackgroundColor(Color.parseColor("#33000000"));
-            } else {
-                tvGyroStatus.setText("✓ 方向正常");
-                tvGyroStatus.setTextColor(Color.GREEN);
-                tvGyroStatus.setBackgroundColor(Color.TRANSPARENT);
+
+            // 1. 更新可视化的水平仪 (核心修改)
+            if (levelOverlayView != null) {
+                // 将当前方向和基准方向传给 View，让它自己计算偏移并绘制
+                // 注意：如果 baseOrientation 为 null，view 内部会处理为默认状态
+                levelOverlayView.updateOrientation(currentOrientation, baseOrientation);
             }
 
-            // 更新陀螺仪信息 - 显示俯仰角、横滚角和方位角
-            String gyroInfo = String.format(Locale.getDefault(),
-                    "当前: 方位角: %.1f°  俯仰角: %.1f°  横滚角: %.1f°\n阈值: 俯仰角 ≤ %.0f°  横滚角 ≤ %.0f°",
-                    currentOrientation[0], // 方位角
-                    currentOrientation[1], // 俯仰角
-                    currentOrientation[2], // 横滚角
-                    PITCH_THRESHOLD,
-                    ROLL_THRESHOLD);
-
-            tvGyroInfo.setText(gyroInfo);
-
-            // 根据偏移状态设置文本颜色
-            if (isOrientationExceeded) {
-                tvGyroInfo.setTextColor(Color.RED);
-            } else {
-                tvGyroInfo.setTextColor(Color.WHITE);
+            // 2. 更新文字状态提示 (简化逻辑，辅助视觉)
+            if (tvGyroStatus != null) {
+                if (baseOrientation == null) {
+                    tvGyroStatus.setText("请保持手机平稳");
+                    tvGyroStatus.setTextColor(Color.WHITE);
+                    tvGyroStatus.setBackgroundColor(Color.TRANSPARENT);
+                } else if (isOrientationExceeded) {
+                    tvGyroStatus.setText("⚠️ 偏移过大，请调整回圆心");
+                    tvGyroStatus.setTextColor(Color.RED);
+                    tvGyroStatus.setBackgroundColor(Color.parseColor("#66000000"));
+                } else {
+                    tvGyroStatus.setText("✓ 角度良好");
+                    tvGyroStatus.setTextColor(Color.GREEN);
+                    tvGyroStatus.setBackgroundColor(Color.TRANSPARENT);
+                }
             }
 
-            // 更新基准方向显示 - 显示所有三个角度
-            if (baseOrientation != null) {
-                String baseInfo = String.format(Locale.getDefault(),
-                        "基准: 方位角: %.1f°  俯仰角: %.1f°  横滚角: %.1f°",
-                        baseOrientation[0], // 基准方位角
-                        baseOrientation[1], // 基准俯仰角
-                        baseOrientation[2]); // 基准横滚角
-                tvBaseOrientation.setText(baseInfo);
-                tvBaseOrientation.setTextColor(Color.YELLOW);
-                tvBaseOrientation.setBackgroundColor(Color.parseColor("#66000000"));
-            } else {
-                tvBaseOrientation.setText("基准: 未设置（拍摄第一张照片时记录）");
-                tvBaseOrientation.setTextColor(Color.LTGRAY);
-                tvBaseOrientation.setBackgroundColor(Color.TRANSPARENT);
+            // 3. 更新基准方向文字提示
+            if (tvBaseOrientation != null) {
+                if (baseOrientation != null) {
+                    // 已锁定基准
+                    tvBaseOrientation.setText("基准已锁定");
+                    tvBaseOrientation.setTextColor(Color.GREEN);
+                } else {
+                    // 未锁定
+                    tvBaseOrientation.setText("拍摄第一张照片以锁定角度");
+                    tvBaseOrientation.setTextColor(Color.LTGRAY);
+                }
             }
+
+            // 原有的 tvGyroInfo 如果设为了 gone，这里更新它也没关系，如果不显示就算了
         });
     }
 
@@ -384,6 +382,13 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
         int tvGyroStatusId = getResources().getIdentifier("tv_gyro_status", "id", requireContext().getPackageName());
         int tvGyroInfoId = getResources().getIdentifier("tv_gyro_info", "id", requireContext().getPackageName());
         int tvBaseOrientationId = getResources().getIdentifier("tv_base_orientation", "id", requireContext().getPackageName());
+
+        int levelOverlayId = getResources().getIdentifier("levelOverlay", "id", requireContext().getPackageName());
+        if (levelOverlayId != 0) {
+            levelOverlayView = view.findViewById(levelOverlayId);
+            // 设置阈值
+            levelOverlayView.setThresholds(PITCH_THRESHOLD, ROLL_THRESHOLD);
+        }
 
         // 初始化相机预览视图
         if (previewViewId != 0) {
