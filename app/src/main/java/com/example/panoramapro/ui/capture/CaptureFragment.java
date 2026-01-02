@@ -1011,24 +1011,62 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     }
 
     /**
+     * 计算采样率 (inSampleSize)
+     * 保证加载的图片宽高不超过 reqWidth 和 reqHeight
+     */
+    private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // 原图的宽高
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // 计算最大的 inSampleSize 值，该值必须是 2 的幂
+            // 且保证宽和高都大于期望的宽高
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+        return inSampleSize;
+    }
+
+    /**
      * 处理并保存照片
-     * 在后台线程中处理照片：旋转、检查宽高比、保存处理后的版本
+     * 在后台线程中处理照片：降采样、旋转、检查宽高比、保存处理后的版本
      */
     private void processAndSavePhoto(File photoFile) {
         // 在后台线程处理照片
         cameraExecutor.execute(() -> {
             try {
-//                if (captures.size() >= WARNING_THRESHOLD) {
-//                    Log.i(TAG, "达到最大照片数量，跳过照片处理");
-//                    return;
-//                }
+                // 定义最大分辨率限制 (例如 2000px)
+                // 原图 4000x3000 -> 内存约 48MB
+                // 降采样后 2000x1500 -> 内存约 12MB (ARGB_8888) 或 6MB (RGB_565)
+                final int MAX_DIMENSION = 1000;
 
-                // 加载原始图片
+                // 1. 第一次解析：只读取图片的宽高信息，不加载到内存
                 BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inSampleSize = 1; // 不进行缩小，保持原始质量
+                options.inJustDecodeBounds = true; // 只读边框
+                BitmapFactory.decodeFile(photoFile.getAbsolutePath(), options);
+
+                // 2. 计算缩放比例
+                options.inSampleSize = calculateInSampleSize(options, MAX_DIMENSION, MAX_DIMENSION);
+
+                // 3. 第二次解析：真正加载图片 (使用计算好的缩放比例)
+                options.inJustDecodeBounds = false;
+
+                // 【内存优化】使用 RGB_565 格式，比默认的 ARGB_8888 节省 50% 内存
+                // 对于拍照拼接，去掉透明通道通常没有影响
+                options.inPreferredConfig = Bitmap.Config.RGB_565;
+
+                // 加载降采样后的图片
                 Bitmap originalBitmap = BitmapFactory.decodeFile(photoFile.getAbsolutePath(), options);
 
                 if (originalBitmap != null) {
+                    Log.i(TAG, "图片加载成功，原始尺寸缩放至: " + originalBitmap.getWidth() + "x" + originalBitmap.getHeight());
+
                     // 旋转图片：确保短边为左右，长边为上下（横屏模式）
                     Bitmap rotatedBitmap = rotateToLandscape(originalBitmap);
 
@@ -1042,9 +1080,12 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                     }
 
                     // 保存处理后的图片到缓存
+                    // 注意：这里保存的文件已经是缩小后的版本了
                     Bitmap finalBitmap = saveToCache(rotatedBitmap, photoFile);
 
                     if (finalBitmap != null) {
+                        // 注意：虽然这里 add 了 bitmap，但建议按照之前的建议，ViewModel 只存路径
+                        // 如果你还没改 ViewModel，这里暂时不动
                         captures.add(finalBitmap);
                         Log.i(TAG, "照片已捕获并处理。总数: " + captures.size());
 
@@ -1070,15 +1111,18 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                         // 更新UI
                         requireActivity().runOnUiThread(() -> {
                             updateUIState();
+                            // 注意：移除了 WARNING_THRESHOLD 的显示，如果你之前已经删了
                             Toast.makeText(requireContext(),
-                                    String.format("已拍摄照片 %d/%d", captures.size(), WARNING_THRESHOLD),
+                                    String.format("已拍摄照片 %d 张", captures.size()),
                                     Toast.LENGTH_SHORT).show();
                         });
                     }
 
                     // 回收原始bitmap
-                    originalBitmap.recycle();
-                    if (rotatedBitmap != finalBitmap && rotatedBitmap != originalBitmap) {
+                    if (originalBitmap != null && !originalBitmap.isRecycled()) {
+                        originalBitmap.recycle();
+                    }
+                    if (rotatedBitmap != null && rotatedBitmap != finalBitmap && rotatedBitmap != originalBitmap && !rotatedBitmap.isRecycled()) {
                         rotatedBitmap.recycle();
                     }
                 } else {
@@ -1088,7 +1132,7 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                     });
                 }
 
-                // 删除临时文件
+                // 删除临时文件 (原始大图)
                 if (photoFile.exists()) {
                     boolean deleted = photoFile.delete();
                     Log.i(TAG, "临时文件删除: " + deleted);
@@ -1110,6 +1154,12 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
                         btnCapture.setEnabled(true);
                         btnCapture.setText("拍照");
                     }
+                });
+            } catch (OutOfMemoryError oom) {
+                // 捕获 OOM 异常，防止应用崩溃
+                Log.e(TAG, "内存不足，无法处理照片", oom);
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(requireContext(), "内存不足，请重启应用或减少拍摄数量", Toast.LENGTH_LONG).show();
                 });
             }
         });
