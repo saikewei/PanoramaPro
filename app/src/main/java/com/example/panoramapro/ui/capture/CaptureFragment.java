@@ -280,88 +280,77 @@ public class CaptureFragment extends Fragment implements SensorEventListener {
     }
 
     /**
-     * 计算设备方向 (修复版)
-     * 解决垂直握持时的万向节死锁(Gimbal Lock)和小球乱跳问题
+     * 计算设备方向 (智能识别版)
+     * 即使应用被锁定为竖屏，也能通过重力感应自动识别横屏拍摄姿态
      */
     private void calculateOrientation() {
         float[] rotationMatrix = new float[9];
 
-        // 1. 获取原始旋转矩阵 (基于手机平放)
+        // 1. 获取原始旋转矩阵
         if (!SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerData, magnetometerData)) {
             return;
         }
 
-        // 2. 根据屏幕当前的旋转状态，重映射坐标轴
-        // 这是解决"小球乱飞"和"方向反了"的关键步骤
-        float[] remappedMatrix = new float[9];
-
-        // 获取当前屏幕的旋转方向 (0, 90, 180, 270)
+        // 获取系统报告的屏幕旋转角度
         int displayRotation = requireActivity().getWindowManager().getDefaultDisplay().getRotation();
 
+        if (displayRotation == android.view.Surface.ROTATION_0) {
+            // accelerometerData[0] 是 X 轴上的重力分量
+            // 如果 X 轴分量很大（接近 9.8 或 -9.8），说明手机是横着拿的
+
+            float xGravity = accelerometerData[0];
+
+            if (xGravity < -4.5f) {
+                // 手机向左倒（Home键在右），这是标准的横屏拍照姿态
+                displayRotation = android.view.Surface.ROTATION_90;
+            } else if (xGravity > 4.5f) {
+                // 手机向右倒（Home键在左），这是反向横屏
+                displayRotation = android.view.Surface.ROTATION_270;
+            }
+            // 否则保持 ROTATION_0 (竖直握持)
+        }
+
+        float[] remappedMatrix = new float[9];
         int axisX, axisY;
 
-        // 根据握持方式定义新的坐标轴
+        // 2. 根据(可能被修正过的)旋转方向，映射坐标轴
+        // 始终将逻辑 Y 轴映射到物理 Z 轴，以防止 Gimbal Lock
         switch (displayRotation) {
             case android.view.Surface.ROTATION_90: // 横屏 (Home键在右)
-                axisX = SensorManager.AXIS_Y;
-                axisY = SensorManager.AXIS_MINUS_X;
-                break;
-            case android.view.Surface.ROTATION_270: // 反向横屏 (Home键在左)
                 axisX = SensorManager.AXIS_MINUS_Y;
-                axisY = SensorManager.AXIS_X;
+                axisY = SensorManager.AXIS_Z;
                 break;
+
+            case android.view.Surface.ROTATION_270: // 反向横屏 (Home键在左)
+                axisX = SensorManager.AXIS_Y;
+                axisY = SensorManager.AXIS_Z;
+                break;
+
             case android.view.Surface.ROTATION_180: // 倒着拿
                 axisX = SensorManager.AXIS_MINUS_X;
-                axisY = SensorManager.AXIS_MINUS_Y;
+                axisY = SensorManager.AXIS_Z;
                 break;
-            case android.view.Surface.ROTATION_0: // 竖屏 (正常握持)
+
+            case android.view.Surface.ROTATION_0: // 竖屏
             default:
                 axisX = SensorManager.AXIS_X;
-                axisY = SensorManager.AXIS_Y;
+                axisY = SensorManager.AXIS_Z;
                 break;
         }
 
-        // 【核心修复】如果手机是竖起来拍照的（Camera应用通常如此），
-        // 我们需要把 Z 轴映射到 Y 轴，或者使用 remapCoordinateSystem
-        // 但最稳健的方法是直接映射到屏幕坐标系：
+        // 3. 应用坐标系重映射
+        SensorManager.remapCoordinateSystem(rotationMatrix, axisX, axisY, remappedMatrix);
 
-        // 这里的逻辑稍微有点绕：SensorManager.getOrientation 返回的是大地坐标系。
-        // 为了避免 Gimbal Lock，我们需要让手机"逻辑上"依然是平放的，
-        // 但实际上我们把手机的 Y 轴（长边）当作 Z 轴（垂直地面）。
-
-        // 针对全景拍照场景（手机垂直地面），这是最稳的映射：
-        // 将设备的 Y 轴映射为世界的 Z 轴 (AXIS_Z)，将 Z 轴映射为 -Y (AXIS_MINUS_Y)
-        // 这样当手机垂直时，Pitch 接近 0，完全避开了 90 度的死锁区。
-        if (displayRotation == android.view.Surface.ROTATION_0) {
-            // 竖屏垂直握持
-            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remappedMatrix);
-        } else {
-            // 横屏垂直握持 (通常全景图是横屏拍)
-            // 此时屏幕的 X 轴对应原本的 Y 轴，我们需要让屏幕面垂直于地面
-            SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_MINUS_X, remappedMatrix); // 尝试适应横屏
-
-            // 如果上面的横屏映射感觉方向反了，请尝试下面这行标准横屏映射：
-            // SensorManager.remapCoordinateSystem(rotationMatrix, SensorManager.AXIS_Z, SensorManager.AXIS_MINUS_X, remappedMatrix);
-        }
-
-        // 3. 计算方向
+        // 4. 计算方向
         float[] orientationValues = new float[3];
         SensorManager.getOrientation(remappedMatrix, orientationValues);
 
-        // 4. 转换角度
-        // values[0]: Azimuth (方位角)
-        // values[1]: Pitch (俯仰角) - 现在手机垂直时，这个值接近 0
-        // values[2]: Roll (横滚角)
-
+        // 5. 转换角度
         for (int i = 0; i < 3; i++) {
             currentOrientation[i] = (float) Math.toDegrees(orientationValues[i]);
         }
 
-        // 5. 简单的符号修正 (可选，取决于你的 LevelOverlayView 画法)
-        // 有时候计算出来的 Pitch 方向可能和 UI 的上下相反，在这里取反即可
-        // currentOrientation[1] = -currentOrientation[1];
-
-        // 确保方位角在0-360之间
+        // 修正方位角范围
         if (currentOrientation[0] < 0) {
             currentOrientation[0] += 360;
         }
