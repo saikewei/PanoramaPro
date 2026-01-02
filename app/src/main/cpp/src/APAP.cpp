@@ -315,10 +315,10 @@ cv::Mat APAP::Stitching(bool enable_linear_blending) {
         int new_h = cvRound(max_y - min_y);
 
         // 限制一下最大尺寸，防止内存爆炸
-        if (new_w * new_h > 5000 * 5000) {
-            LOGE("APAP::Stitching - 计算出的画布尺寸过大");
-            return {};
-        }
+//        if (new_w * new_h > 5000 * 5000) {
+//            LOGE("APAP::Stitching - 计算出的画布尺寸过大");
+//            return {};
+//        }
 
         // 5. APAP 计算
         // 生成覆盖整个新画布的网格
