@@ -4,6 +4,7 @@
 
 #include "SIFT.h"
 #include "Utils.h"
+#include "Logger.h"
 
 bool SIFT::Load_image(std::vector<cv::Mat>&& _images) {
     images = std::move(_images);
@@ -16,27 +17,89 @@ bool SIFT::Load_image(std::vector<cv::Mat>&& _images) {
 
 cv::Mat SIFT::Stitching(bool enable_linear_blending) {
     if (images.size() < 2) {
+        LOGE("[SIFT拼接] 至少需要两张图像才能进行拼接");
         return images.empty() ? cv::Mat() : images[0];
     }
 
-    // 简单的序列拼接策略：img1 + img2 -> result; result + img3 -> result...
-    // 注意：对于高质量全景图，通常需要 Bundle Adjustment，但这里演示经典的逐对拼接
-    cv::Mat result = images[0];
+    LOGI("[SIFT拼接] 开始进行基于光束法平差的全景拼接，图像数量：%zu",
+         images.size());
 
-    for (size_t i = 1; i < images.size(); ++i) {
-        std::cout << "[SIFTStitcher] Stitching image " << i << "..." << std::endl;
-        cv::Mat temp_result = StitchTwoImages(result, images[i], enable_linear_blending);
+    // 1. 创建 Stitcher（全景模式，适合旋转拍摄）
+    cv::Ptr<cv::Stitcher> stitcher =
+            cv::Stitcher::create(cv::Stitcher::PANORAMA);
 
-        if (temp_result.empty()) {
-            std::cerr << "[SIFTStitcher] Stitching failed at index " << i << std::endl;
-            break;
-        }
-        result = temp_result;
+    // =========================================================
+    // 使用 SIFT 作为特征提取器（新版 OpenCV 写法）
+    // =========================================================
+    cv::Ptr<cv::SIFT> sift = cv::SIFT::create(
+            0,     // 不限制特征点数量
+            3,     // 每个 octave 的层数
+            0.04,  // 对比度阈值
+            10,    // 边缘阈值
+            1.6    // 高斯模糊 sigma
+    );
+    stitcher->setFeaturesFinder(sift);
+
+    LOGD("[SIFT拼接] 已配置 SIFT 特征提取器");
+
+    // =========================================================
+    // 配置 Bundle Adjustment（光束法平差，Ray 模型）
+    // =========================================================
+    stitcher->setBundleAdjuster(
+            cv::makePtr<cv::detail::BundleAdjusterRay>());
+
+    stitcher->setWaveCorrection(true);
+
+    LOGD("[SIFT拼接] 已启用 Bundle Adjustment（Ray）与波形校正");
+
+    // =========================================================
+    // 配置融合器（Blender）
+    // =========================================================
+    if (enable_linear_blending) {
+        stitcher->setBlender(
+                cv::makePtr<cv::detail::MultiBandBlender>());
+        LOGD("[SIFT拼接] 使用多频段融合（MultiBandBlender）");
+    } else {
+        stitcher->setBlender(
+                cv::makePtr<cv::detail::FeatherBlender>());
+        LOGD("[SIFT拼接] 使用羽化融合（FeatherBlender）");
     }
 
-    return result;
+    // 2. 执行拼接
+    cv::Mat pano;
+    cv::Stitcher::Status status = stitcher->stitch(images, pano);
+
+    // 3. 错误处理
+    if (status != cv::Stitcher::OK) {
+        LOGE("[SIFT拼接] 拼接失败，错误码：%d", static_cast<int>(status));
+
+        switch (status) {
+            case cv::Stitcher::ERR_NEED_MORE_IMGS:
+                LOGE("[SIFT拼接] 特征点不足，无法完成图像匹配");
+                break;
+
+            case cv::Stitcher::ERR_HOMOGRAPHY_EST_FAIL:
+                LOGE("[SIFT拼接] 单应性矩阵估计失败，可能是视角变化过大或匹配错误");
+                break;
+
+            case cv::Stitcher::ERR_CAMERA_PARAMS_ADJUST_FAIL:
+                LOGE("[SIFT拼接] 相机参数优化失败（光束法平差未收敛）");
+                break;
+
+            default:
+                LOGE("[SIFT拼接] 未知错误");
+                break;
+        }
+        return {};
+    }
+
+    LOGI("[SIFT拼接] 拼接成功，输出图像尺寸：%d x %d",
+         pano.cols, pano.rows);
+
+    return pano;
 }
 
+//废弃
 cv::Mat SIFT::StitchTwoImages(const cv::Mat& img1, const cv::Mat& img2, bool enable_linear_blending) {
     // 1. SIFT 特征点检测与描述子提取
     cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
