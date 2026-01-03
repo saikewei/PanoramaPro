@@ -154,7 +154,7 @@ Java_com_example_panoramapro_core_LaMaCompleter_nativeRelease(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_panoramapro_core_TinyPlanetProcessor_nativeProcessTinyPlanet(
+Java_com_example_panoramapro_effects_TinyPlanetProcessor_nativeProcessTinyPlanet(
         JNIEnv *env,
 jobject /* this */,
 jobject input_bitmap,

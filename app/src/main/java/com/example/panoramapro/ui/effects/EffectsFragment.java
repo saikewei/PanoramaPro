@@ -19,7 +19,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.panoramapro.R;
-import com.example.panoramapro.core.TinyPlanetProcessor;
+import com.example.panoramapro.effects.TinyPlanetProcessor;
 
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
@@ -77,7 +77,7 @@ public class EffectsFragment extends Fragment {
                     processor.setScale(1.2f); // 略微放大增强视觉冲击力
 
                     // 调用 Native C++ 极坐标转换算法
-                    Bitmap result = processor.complete(source);
+                    Bitmap result = processor.applyLittlePlanetEffect(source);
 
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
