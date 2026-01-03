@@ -4,11 +4,11 @@ import android.graphics.Bitmap;
 
 public class TinyPlanetProcessor implements IEffectsProcessor {
 
-    private float scale = 1.0f;
+    private float scale = 1.2f;
     private int outputSize = 1024;
 
     public void setScale(float scale) {
-        this.scale = Math.max(0.1f, scale);
+        this.scale = Math.max(0.5f, Math.min(3.0f, scale));
     }
 
     public void setOutputSize(int size) {
