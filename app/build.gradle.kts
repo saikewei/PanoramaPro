@@ -84,4 +84,21 @@ dependencies {
     // 3. Glide (用于加载图片)
     implementation(libs.glide)
     // 如果后续使用 Glide 的注解生成器，可能需要添加: annotationProcessor(libs.glide.compiler)
+
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.10.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.navigation:navigation-fragment:2.7.5")
+    implementation("androidx.navigation:navigation-ui:2.7.5")
+    implementation("androidx.lifecycle:lifecycle-viewmodel:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-livedata:2.6.2")
+// 添加 Material Design 组件
+    implementation("com.google.android.material:material:1.10.0")
+// 添加 ViewPager2
+    implementation("androidx.viewpager2:viewpager2:1.0.0")
 }

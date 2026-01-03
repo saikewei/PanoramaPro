@@ -14,4 +14,8 @@
         android:id="@+id/navigation_effects"
         android:icon="@drawable/ic_planet"
         android:title="@string/title_effects" />
+    <item
+        android:id="@+id/navigation_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="@string/title_settings" />
 </menu>

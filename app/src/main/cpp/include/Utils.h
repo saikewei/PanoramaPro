@@ -40,5 +40,7 @@ public:
      * 注意：会执行 BGR -> RGBA 的颜色转换
      */
     static jobject matToBitmap(JNIEnv *env, const cv::Mat& src);
+
+    static cv::Mat BlendImages(const cv::Mat& img1, const cv::Mat& img2);
 };
 #endif //PANORAMAPRO_UTILS_H

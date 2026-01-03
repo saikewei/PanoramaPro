@@ -12,12 +12,17 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
-import com.example.panoramapro.core.APAPStitcher;
-import com.example.panoramapro.core.LaMaCompleter;
-import com.example.panoramapro.utils.FileUtils;
 
+import com.example.panoramapro.core.IImageCompleter;
+import com.example.panoramapro.core.IStitcher;
+import com.example.panoramapro.core.ImageProcessorFactory;
+import com.example.panoramapro.utils.BitmapSaver;
+
+import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +36,7 @@ public class StitchingViewModel extends AndroidViewModel {
 
     // LiveData 用于通知 UI 更新
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
-    private final MutableLiveData<Bitmap> resultBitmap = new MutableLiveData<>();
+    private final MutableLiveData<List<File>> localImages = new MutableLiveData<>();
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
 
     public StitchingViewModel(@NonNull Application application) {
@@ -39,8 +44,43 @@ public class StitchingViewModel extends AndroidViewModel {
     }
 
     public LiveData<Boolean> getIsLoading() { return isLoading; }
-    public LiveData<Bitmap> getResultBitmap() { return resultBitmap; }
+    public LiveData<List<File>> getLocalImages() { return localImages; }
     public LiveData<String> getErrorMessage() { return errorMessage; }
+
+    private final MutableLiveData<String> stitchSuccessEvent = new MutableLiveData<>();
+    public LiveData<String> getStitchSuccessEvent() { return stitchSuccessEvent; }
+
+    /**
+     * 加载本地存储的图片
+     */
+    public void loadLocalImages() {
+        executorService.execute(() -> {
+            File dir = BitmapSaver.getPanoramaDir(getApplication());
+            File[] files = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".jpg") || name.toLowerCase().endsWith(".png"));
+
+            List<File> fileList = new ArrayList<>();
+            if (files != null) {
+                fileList.addAll(Arrays.asList(files));
+                // 按最后修改时间倒序排列（最新的在前面）
+                Collections.sort(fileList, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+            }
+            localImages.postValue(fileList);
+        });
+    }
+
+    /**
+     * 删除选中的图片
+     */
+    public void deleteImages(List<File> filesToDelete) {
+        executorService.execute(() -> {
+            for (File file : filesToDelete) {
+                if (file.exists()) {
+                    file.delete();
+                }
+            }
+            loadLocalImages(); // 删除后刷新列表
+        });
+    }
 
     /**
      * 开始拼接任务
@@ -54,11 +94,13 @@ public class StitchingViewModel extends AndroidViewModel {
 
         isLoading.setValue(true);
 
-        // 在子线程执行
         executorService.execute(() -> {
             try {
                 Context context = getApplication().getApplicationContext();
                 List<Bitmap> inputBitmaps = new ArrayList<>();
+                ImageProcessorFactory factory = new ImageProcessorFactory(context);
+                IStitcher stitcher = factory.getStitcher();
+                IImageCompleter completer = factory.getCompleter();
 
                 // 1. 加载图片
                 for (Uri uri : imageUris) {
@@ -68,41 +110,31 @@ public class StitchingViewModel extends AndroidViewModel {
                     }
                 }
 
-                if (inputBitmaps.size() < 2) {
-                    throw new Exception("图片加载失败，无法获取 Bitmap");
-                }
+                if (inputBitmaps.size() < 2) throw new Exception("图片加载失败");
 
-                // 2. 执行 APAP 拼接 (Java -> C++)
-                APAPStitcher stitcher = new APAPStitcher();
+                // 2. 拼接
                 Bitmap stitched = stitcher.stitch(inputBitmaps, true);
+                if (stitched == null) throw new Exception("拼接失败，特征点不足");
 
-                if (stitched == null) {
-                    throw new Exception("拼接失败，可能是特征点不足");
-                }
-
-                Log.i(TAG, "拼接完成，开始准备模型...");
-
-                // 3. 准备 LaMa 模型 (拷贝到 Files 目录)
-                String modelPath = FileUtils.copyAssetToFilesDir(context, "lama_fp32.onnx");
-                if (modelPath == null) {
-                    throw new Exception("模型文件拷贝失败");
-                }
-
-                // 4. 执行 AI 补全 (Java -> C++)
-                // 注意：LaMaCompleter 需要在不使用时 release，这里为了简单在方法内创建并释放
-                LaMaCompleter completer = new LaMaCompleter(modelPath);
+                // 3. AI 补全
                 Bitmap finalResult = completer.complete(stitched);
-                completer.release(); // 释放 C++ 资源
+                completer.release();
+                if (finalResult == null) throw new Exception("AI 补全失败");
 
-                if (finalResult == null) {
-                    throw new Exception("AI 补全返回空结果");
+                // 4. 【修改点】保存结果到本地相册
+                String savedPath = BitmapSaver.saveBitmapToPrivateStorage(context, finalResult);
+
+                if (savedPath != null) {
+                    // 通知 UI 成功
+                    stitchSuccessEvent.postValue(savedPath);
+                    // 刷新列表以显示新图片
+                    loadLocalImages();
+                } else {
+                    throw new Exception("保存图片失败");
                 }
-
-                // 5. 成功，更新 UI (postValue 会自动切换到主线程)
-                resultBitmap.postValue(finalResult);
 
             } catch (Exception e) {
-                Log.e(TAG, "处理过程中发生错误", e);
+                Log.e(TAG, "Process error", e);
                 errorMessage.postValue("处理失败: " + e.getMessage());
             } finally {
                 isLoading.postValue(false);

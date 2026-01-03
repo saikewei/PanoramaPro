@@ -60,6 +60,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         src/FeatureMatcher.cpp
         src/ImageCompleter.cpp
         src/LaMaInpainter.cpp
+        src/SIFT.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

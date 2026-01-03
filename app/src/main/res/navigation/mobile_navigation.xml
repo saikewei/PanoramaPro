@@ -1,21 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/navigation_gallery">
+    app:startDestination="@+id/navigation_capture">
 
+    <!-- 相册/拼接 Fragment -->
     <fragment
         android:id="@+id/navigation_gallery"
         android:name="com.example.panoramapro.ui.gallery.GalleryFragment"
-        android:label="Gallery" />
+        android:label="相册"
+        tools:layout="@layout/fragment_gallery" />
 
+    <!-- 拍照 Fragment -->
     <fragment
         android:id="@+id/navigation_capture"
         android:name="com.example.panoramapro.ui.capture.CaptureFragment"
-        android:label="Capture" />
+        android:label="拍照"
+        tools:layout="@layout/fragment_capture">
 
+        <!-- 导航到预览界面 -->
+        <action
+            android:id="@+id/action_captureFragment_to_previewFragment"
+            app:destination="@id/previewFragment" />
+    </fragment>
+
+    <!-- 预览 Fragment -->
+    <fragment
+        android:id="@+id/previewFragment"
+        android:name="com.example.panoramapro.ui.capture.PreviewFragment"
+        android:label="预览照片"
+        tools:layout="@layout/fragment_preview">
+
+        <!-- 返回到拍摄界面 -->
+        <action
+            android:id="@+id/action_previewFragment_back_to_capture"
+            app:destination="@id/navigation_capture"
+            app:popUpTo="@id/navigation_capture"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 特效 Fragment -->
     <fragment
         android:id="@+id/navigation_effects"
         android:name="com.example.panoramapro.ui.effects.EffectsFragment"
-        android:label="Effects" />
+        android:label="特效"
+        tools:layout="@layout/fragment_effects"/>
+
+    <fragment
+        android:id="@+id/navigation_settings"
+        android:name="com.example.panoramapro.ui.settings.SettingsFragment"
+        android:label="Settings" />
 </navigation>
