@@ -54,7 +54,6 @@ include_directories(
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # JNI 入口文件
         native-lib.cpp
-
         src/APAP.cpp
         src/Utils.cpp
         src/FeatureMatcher.cpp
@@ -70,7 +69,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         ${OpenCV_LIBS}
         lib_onnxruntime
-
         android
         log
         jnigraphics

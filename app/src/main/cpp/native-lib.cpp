@@ -3,6 +3,7 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include <android/bitmap.h>
+#include <cmath>
 #include "APAP.h"
 #include "Utils.h"
 #include "ImageCompleter.h"
@@ -153,6 +154,62 @@ Java_com_example_panoramapro_core_LaMaCompleter_nativeRelease(
     delete inpainter;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_panoramapro_effects_TinyPlanetProcessor_nativeProcessTinyPlanet(
+        JNIEnv *env,
+jobject /* this */,
+jobject input_bitmap,
+        jobject output_bitmap,
+jfloat scale) {
+
+// 1. 将输入 Bitmap 转换为 Mat
+cv::Mat src = Utils::bitmapToMat(env, input_bitmap);
+if (src.empty()) return;
+
+// 2. 获取输出尺寸
+AndroidBitmapInfo outInfo;
+AndroidBitmap_getInfo(env, output_bitmap, &outInfo);
+int output_size = outInfo.width;
+
+// 3. 准备重映射坐标表
+cv::Mat mapX(output_size, output_size, CV_32FC1);
+cv::Mat mapY(output_size, output_size, CV_32FC1);
+
+float centerX = output_size / 2.0f;
+float centerY = output_size / 2.0f;
+float maxRadius = (output_size / 2.0f) * scale;
+
+// 4. 极坐标映射计算
+for (int y = 0; y < output_size; y++) {
+float* ptrX = mapX.ptr<float>(y);
+float* ptrY = mapY.ptr<float>(y);
+for (int x = 0; x < output_size; x++) {
+float dx = (float)x - centerX;
+float dy = (float)y - centerY;
+float r = std::sqrt(dx * dx + dy * dy);
+float angle = std::atan2(dy, dx);
+
+// X 映射 (0 to 360度)
+ptrX[x] = ((angle + (float)CV_PI) / (2.0f * (float)CV_PI)) * (float)src.cols;
+// Y 映射 (地面在圆心)
+ptrY[x] = (1.0f - (r / maxRadius)) * (float)src.rows;
+}
+}
+
+// 5. 执行 Remap 并处理缝隙
+cv::Mat result;
+cv::remap(src, result, mapX, mapY, cv::INTER_LINEAR, cv::BORDER_WRAP);
+
+// 6. 将结果写回输出 Bitmap 内存
+void* pixels;
+if (AndroidBitmap_lockPixels(env, output_bitmap, &pixels) >= 0) {
+cv::Mat dst_rgba(output_size, output_size, CV_8UC4, pixels);
+cv::Mat result_rgba;
+cv::cvtColor(result, result_rgba, cv::COLOR_BGR2RGBA);
+result_rgba.copyTo(dst_rgba);
+AndroidBitmap_unlockPixels(env, output_bitmap);
+}
+}
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_example_panoramapro_core_SIFTStitcher_nativeStitchImages(
         JNIEnv* env,
